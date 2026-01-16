@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 import { ref, watch } from 'vue'
 import { useCartStore } from '../stores/cart'
 import { useAuthStore } from '../stores/auth'
-import { ClipboardDocumentListIcon, UserIcon, ArrowPathRoundedSquareIcon } from '@heroicons/vue/24/outline'
+import { ClipboardDocumentListIcon, UserIcon, ArrowPathRoundedSquareIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import { LogOut } from 'lucide-vue-next'
 import {
   DropdownMenu,
@@ -35,6 +35,26 @@ watch(() => cart.totalItems, (newVal, oldVal) => {
         
         <!-- Left Side: Brand + Primary Nav -->
         <div class="flex items-center gap-8">
+           <!-- Mobile Menu (Hamburger) -->
+           <div class="md:hidden mr-2">
+             <DropdownMenu v-if="!auth.isAdmin">
+               <DropdownMenuTrigger class="focus:outline-none">
+                 <Bars3Icon class="w-6 h-6 text-zinc-600" />
+               </DropdownMenuTrigger>
+               <DropdownMenuContent align="start" class="w-48 bg-white" :side-offset="8">
+                 <DropdownMenuItem>
+                    <RouterLink to="/equipment" class="w-full">器材列表</RouterLink>
+                 </DropdownMenuItem>
+                 <DropdownMenuItem>
+                    <RouterLink to="/consumables" class="w-full">耗材列表</RouterLink>
+                 </DropdownMenuItem>
+                 <DropdownMenuItem>
+                    <RouterLink to="/meeting-rooms" class="w-full">空間預約</RouterLink>
+                 </DropdownMenuItem>
+               </DropdownMenuContent>
+             </DropdownMenu>
+           </div>
+
            <!-- Brand -->
            <RouterLink :to="auth.isAdmin ? '/admin/dashboard' : '/equipment'" class="flex items-center gap-2 group">
               <span class="text-lg font-bold tracking-tight text-zinc-950">E&S</span>
