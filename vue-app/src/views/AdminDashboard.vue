@@ -150,7 +150,8 @@ const newItem = ref({
   custom_id: '',
   name: '',
   category: '',
-  total_stock: 1
+  total_stock: 1,
+  safety_stock: null
 })
 
 function handleNavigation({ status }) {
@@ -208,18 +209,24 @@ async function fetchInventory() {
 // Watch for tab change is combined below
 
 async function addItem() {
-    const { error } = await supabase.from('items').insert({
+    const payload = {
         custom_id: newItem.value.custom_id,
         name: newItem.value.name,
         category: newItem.value.category,
         total_stock: newItem.value.total_stock,
         type: activeTab.value === 'CONSUMABLES' ? 'CONSUMABLE' : 'EQUIPMENT'
-    })
+    }
+    
+    if (newItem.value.safety_stock !== null && newItem.value.safety_stock !== '') {
+        payload.safety_stock = newItem.value.safety_stock
+    }
+
+    const { error } = await supabase.from('items').insert(payload)
     
     if (error) {
         triggerToast('新增失敗: ' + error.message, 'error')
     } else {
-        newItem.value = { custom_id: '', name: '', category: '', total_stock: 1 }
+        newItem.value = { custom_id: '', name: '', category: '', total_stock: 1, safety_stock: null }
         fetchInventory()
         triggerToast(activeTab.value === 'CONSUMABLES' ? '耗材新增成功' : '器材新增成功')
     }
@@ -504,12 +511,12 @@ async function deleteUser(userId) {
       <!-- Add Item Form -->
       <div class="bg-white p-6 rounded-lg border border-zinc-200 mb-6 shadow-sm">
         <h3 class="text-base font-bold text-zinc-900 mb-4">{{ activeTab === 'CONSUMABLES' ? '新增耗材' : '新增器材' }}</h3>
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
           <div>
             <label class="block text-xs font-semibold text-zinc-700 mb-1">ID</label>
             <input v-model="newItem.custom_id" type="text" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="選填">
           </div>
-          <div>
+          <div class="md:col-span-2">
             <label class="block text-xs font-semibold text-zinc-700 mb-1">{{ activeTab === 'CONSUMABLES' ? '耗材名稱' : '器材名稱' }}</label>
             <input v-model="newItem.name" type="text" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="必填">
           </div>
@@ -522,7 +529,11 @@ async function deleteUser(userId) {
             <input v-model.number="newItem.total_stock" type="number" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="1">
           </div>
           <div>
-             <button @click="addItem" :disabled="!newItem.name || !newItem.category" class="h-10 w-full bg-zinc-900 text-white px-4 rounded-md hover:bg-zinc-800 disabled:opacity-50 text-sm font-medium transition-colors flex items-center justify-center">
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">安全庫存量</label>
+            <input v-model.number="newItem.safety_stock" type="number" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="選填">
+          </div>
+          <div class="md:col-span-6 flex justify-end mt-2">
+             <button @click="addItem" :disabled="!newItem.name || !newItem.category" class="h-10 px-6 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50 text-sm font-medium transition-colors flex items-center justify-center">
                 {{ activeTab === 'CONSUMABLES' ? '新增耗材' : '新增器材' }}
              </button>
           </div>
@@ -560,6 +571,7 @@ async function deleteUser(userId) {
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">名稱</th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">分類</th>
               <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">庫存</th>
+              <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">安全庫存</th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">狀態</th>
               <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">操作</th>
             </tr>
@@ -574,6 +586,7 @@ async function deleteUser(userId) {
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">{{ item.category }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-zinc-900">{{ item.total_stock }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-zinc-500">{{ item.safety_stock || '-' }}</td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md border" :class="item.is_active ? 'bg-white border-zinc-300 text-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-400'">
                   <span v-if="item.is_active" class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 my-auto"></span>
@@ -596,6 +609,10 @@ async function deleteUser(userId) {
                       <Trash class="mr-2 h-4 w-4" />
                       <span>刪除</span>
                     </DropdownMenuItem>
+                    <!-- <DropdownMenuItem class="text-zinc-900">
+                      <FileEdit class="mr-2 h-4 w-4" />
+                      <span>編輯</span>
+                    </DropdownMenuItem> -->
                   </DropdownMenuContent>
                 </DropdownMenu>
               </td>

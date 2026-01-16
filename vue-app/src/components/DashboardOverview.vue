@@ -1,10 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { startOfMonth, subDays, format, isSameDay, isAfter, isBefore, addDays } from 'date-fns'
-import { ArrowRightIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon } from 'lucide-vue-next'
+import { ArrowRightIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon, XIcon } from 'lucide-vue-next'
 import { useTransition, TransitionPresets } from '@vueuse/core'
 
 const isMounted = ref(false)
+const showLowStockModal = ref(false)
+const showPendingModal = ref(false)
+const showActiveLoansModal = ref(false)
 
 onMounted(() => {
     // Small delay to ensure transition triggers after render
@@ -30,16 +33,24 @@ const emit = defineEmits(['navigate'])
 
 // --- Layer 1: The Pulse (Metrics) ---
 
-// --- Layer 1: The Pulse (Metrics) ---
-
-const pendingCountSource = computed(() => isMounted.value ? props.orders.filter(o => o.status === 'PENDING').length : 0)
+const pendingOrders = computed(() => props.orders.filter(o => o.status === 'PENDING').sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
+const pendingCountSource = computed(() => isMounted.value ? pendingOrders.value.length : 0)
 const pendingCount = useTransition(pendingCountSource, { duration: 1500, transition: TransitionPresets.easeOutExpo })
 
 const activeLoansSource = computed(() => props.orders.filter(o => ['APPROVED', 'COMPLETED'].includes(o.status)))
 const activeLoansCountSource = computed(() => isMounted.value ? activeLoansSource.value.length : 0)
 const activeLoansCount = useTransition(activeLoansCountSource, { duration: 1500, delay: 100, transition: TransitionPresets.easeOutExpo })
 
-const lowStockCountSource = computed(() => isMounted.value ? props.inventory.filter(i => i.total_stock <= 3).length : 0)
+// Low Stock Logic:
+// If safety_stock is set (not null), check total_stock <= safety_stock
+// If safety_stock is null, we assume no alert needed (e.g. fixed assets)
+// Note: We used to filter out '空間', now we rely on safety_stock being null for them.
+const lowStockItems = computed(() => props.inventory.filter(i => 
+    i.safety_stock !== null && 
+    i.safety_stock !== undefined && 
+    i.total_stock <= i.safety_stock
+))
+const lowStockCountSource = computed(() => isMounted.value ? lowStockItems.value.length : 0)
 const lowStockCount = useTransition(lowStockCountSource, { duration: 1500, delay: 200, transition: TransitionPresets.easeOutExpo })
 
 const monthlyUsageSource = computed(() => {
@@ -154,7 +165,7 @@ const feedItems = computed(() => {
       <!-- Layer 1: The Pulse -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-both" style="animation-fill-mode: both;">
           <!-- Pending -->
-           <div class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
+           <div @click="showPendingModal = true" class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 transition-colors">
                <div class="flex justify-between items-start">
                    <span class="text-sm font-medium text-zinc-500">待審核申請</span>
                    <div v-if="pendingCount > 0" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
@@ -168,7 +179,7 @@ const feedItems = computed(() => {
            </div>
 
            <!-- Active Loans -->
-           <div class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
+           <div @click="showActiveLoansModal = true" class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 transition-colors">
                <div class="flex justify-between items-start">
                    <span class="text-sm font-medium text-zinc-500">出借中器材</span>
                </div>
@@ -181,7 +192,7 @@ const feedItems = computed(() => {
            </div>
 
            <!-- Low Stock -->
-           <div class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
+           <div @click="showLowStockModal = true" class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 transition-colors">
                <div class="flex justify-between items-start">
                    <span class="text-sm font-medium text-zinc-500">庫存緊張</span>
                    <div v-if="lowStockCount > 0" class="flex items-center justify-center bg-zinc-100 rounded text-[10px] font-bold px-1.5 py-0.5 text-zinc-600 border border-zinc-200">
@@ -296,5 +307,133 @@ const feedItems = computed(() => {
               </table>
           </div>
       </div>
+      
+      <!-- Low Stock Modal -->
+      <Teleport to="body">
+        <div v-if="showLowStockModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" @click="showLowStockModal = false"></div>
+            
+            <!-- Modal Content -->
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+                <div class="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+                    <div class="flex items-center gap-2">
+                         <div class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                         <h3 class="font-bold text-zinc-900">庫存緊張清單</h3>
+                    </div>
+                    <button @click="showLowStockModal = false" class="p-1 hover:bg-zinc-200 rounded transition-colors text-zinc-500">
+                        <XIcon class="w-5 h-5" />
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-2">
+                    <div v-if="lowStockItems.length === 0" class="p-8 text-center text-zinc-400 text-sm">
+                        目前沒有庫存緊張的項目
+                    </div>
+                    <div v-else class="space-y-1">
+                        <div v-for="item in lowStockItems" :key="item.id" class="p-3 bg-white hover:bg-zinc-50 rounded-lg border border-zinc-100 transition-colors flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="px-2 py-1 bg-zinc-100 text-zinc-500 text-[10px] font-mono rounded border border-zinc-200">{{ item.custom_id }}</span>
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-medium text-zinc-900">{{ item.name }}</span>
+                                    <span class="text-xs text-zinc-500">{{ item.category }}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs text-zinc-400">剩餘</span>
+                                <span class="text-sm font-bold text-orange-600 px-2 py-0.5 bg-orange-50 rounded">{{ item.total_stock }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-4 border-t border-zinc-100 bg-zinc-50/50 text-center">
+                    <button @click="showLowStockModal = false" class="w-full py-2 bg-white border border-zinc-200 text-zinc-700 font-medium rounded-lg text-sm hover:bg-zinc-50 transition-colors">
+                        關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+      </Teleport>
+
+      <!-- Pending Orders Modal -->
+      <Teleport to="body">
+        <div v-if="showPendingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog">
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" @click="showPendingModal = false"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+                <div class="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+                    <div class="flex items-center gap-2">
+                         <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                         <h3 class="font-bold text-zinc-900">待審核申請</h3>
+                    </div>
+                    <button @click="showPendingModal = false" class="p-1 hover:bg-zinc-200 rounded transition-colors text-zinc-500">
+                        <XIcon class="w-5 h-5" />
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2">
+                    <div v-if="pendingOrders.length === 0" class="p-8 text-center text-zinc-400 text-sm">
+                        目前沒有待審核的申請
+                    </div>
+                    <div v-else class="space-y-1">
+                        <div v-for="order in pendingOrders" :key="order.id" class="p-3 bg-white hover:bg-zinc-50 rounded-lg border border-zinc-100 transition-colors">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-sm font-bold text-zinc-900">{{ order.applicant_name }}</span>
+                                <span class="text-xs text-zinc-500 font-mono">{{ format(new Date(order.created_at), 'MM/dd HH:mm') }}</span>
+                            </div>
+                            <div class="space-y-1">
+                                <div v-for="item in order.order_items" :key="item.item_custom_id" class="flex justify-between text-xs text-zinc-600">
+                                    <span>{{ item.item_name_snapshot }}</span>
+                                    <span>x{{ item.quantity }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-zinc-100 bg-zinc-50/50 text-center">
+                    <button @click="showPendingModal = false" class="w-full py-2 bg-white border border-zinc-200 text-zinc-700 font-medium rounded-lg text-sm hover:bg-zinc-50 transition-colors">關閉</button>
+                </div>
+            </div>
+        </div>
+      </Teleport>
+
+      <!-- Active Loans Modal -->
+      <Teleport to="body">
+        <div v-if="showActiveLoansModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog">
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" @click="showActiveLoansModal = false"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+                <div class="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+                    <div class="flex items-center gap-2">
+                         <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                         <h3 class="font-bold text-zinc-900">出借中器材</h3>
+                    </div>
+                    <button @click="showActiveLoansModal = false" class="p-1 hover:bg-zinc-200 rounded transition-colors text-zinc-500">
+                        <XIcon class="w-5 h-5" />
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2">
+                    <div v-if="activeLoansSource.length === 0" class="p-8 text-center text-zinc-400 text-sm">
+                        目前沒有出借中的器材
+                    </div>
+                    <div v-else class="space-y-1">
+                        <div v-for="order in activeLoansSource" :key="order.id" class="p-3 bg-white hover:bg-zinc-50 rounded-lg border border-zinc-100 transition-colors">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-sm font-bold text-zinc-900">{{ order.applicant_name }}</span>
+                                <span class="text-xs text-zinc-500">歸還日: {{ order.end_date }}</span>
+                            </div>
+                            <div class="space-y-1">
+                                <div v-for="item in order.order_items" :key="item.item_custom_id" class="flex justify-between text-xs text-zinc-600">
+                                    <span>{{ item.item_name_snapshot }}</span>
+                                    <span>x{{ item.quantity }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-zinc-100 bg-zinc-50/50 text-center">
+                    <button @click="showActiveLoansModal = false" class="w-full py-2 bg-white border border-zinc-200 text-zinc-700 font-medium rounded-lg text-sm hover:bg-zinc-50 transition-colors">關閉</button>
+                </div>
+            </div>
+        </div>
+      </Teleport>
   </div>
 </template>
