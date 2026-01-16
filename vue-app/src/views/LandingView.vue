@@ -25,7 +25,8 @@ async function handleLogin() {
     
     try {
         const user = await authStore.login(username.value, password.value)
-        if (user.role === 'ADMIN') {
+        // Check currentRole from store (which is already set to ADMIN if one of the roles is ADMIN)
+        if (authStore.currentRole === 'ADMIN') {
             router.push('/admin/dashboard')
         } else {
             router.push('/equipment')
