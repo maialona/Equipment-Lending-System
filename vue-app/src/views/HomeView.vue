@@ -49,7 +49,7 @@ onMounted(() => {
     <!-- Hero / Header -->
     <div class="mb-8 text-center sm:text-left">
       <h1 class="text-3xl font-bold text-zinc-900 mb-2">器材借用</h1>
-      <p class="text-zinc-500">請選擇您需要的器材並加入清單，最後進行結帳預約。</p>
+      <p class="text-zinc-500">請選擇您需要的器材並加入清單。</p>
     </div>
 
     <!-- Category Filter -->
