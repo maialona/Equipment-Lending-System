@@ -25,17 +25,17 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
+import { toast } from 'vue-sonner'
+
 const cart = useCartStore()
 const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
 const success = ref(false)
-const errorMsg = ref('')
 
 // --- Split Forms ---
 const commonForm = reactive({
   applicant_name: '',
-  department: '', // Default to empty string if not provided
   purpose: '',
 })
 
@@ -84,29 +84,29 @@ const timeOptions = [
 
 async function submitOrder() {
   if (cart.items.length === 0) return
-  errorMsg.value = ''
 
   // 1. Auth Check
   if (!auth.isAuthenticated) {
-      if (confirm('請先登入才能送出申請')) router.push('/')
+      toast.error('請先登入才能送出申請')
+      router.push('/')
       return
   }
 
   // 2. Validation
   // Common
   if (!commonForm.applicant_name || !commonForm.purpose) {
-      errorMsg.value = '請填寫申請人姓名與用途'
+      toast.error('請填寫申請人姓名與用途')
       return
   }
 
   // Space Validation
   if (hasSpace.value) {
       if (!spaceForm.date || !spaceForm.start_time || !spaceForm.end_time) {
-          errorMsg.value = '[空間預約] 請完整填寫日期與時段'
+          toast.error('[空間預約] 請完整填寫日期與時段')
           return
       }
       if (spaceForm.start_time >= spaceForm.end_time) {
-          errorMsg.value = '[空間預約] 結束時間必須晚於開始時間'
+          toast.error('[空間預約] 結束時間必須晚於開始時間')
           return
       }
   }
@@ -114,11 +114,11 @@ async function submitOrder() {
   // Equipment Validation
   if (hasEquip.value) {
       if (!equipForm.start_date || !equipForm.end_date) {
-          errorMsg.value = '[器材借用] 請填寫借用與歸還日期'
+          toast.error('[器材借用] 請填寫借用與歸還日期')
           return
       }
       if (equipForm.start_date > equipForm.end_date) {
-          errorMsg.value = '[器材借用] 歸還日期不能早於開始日期'
+          toast.error('[器材借用] 歸還日期不能早於開始日期')
           return
       }
   }
@@ -216,11 +216,12 @@ async function submitOrder() {
       }
 
       success.value = true
+      toast.success('申請已送出！')
       cart.clearCart()
 
   } catch (e) {
       console.error(e)
-      errorMsg.value = '提交失敗: ' + e.message
+      toast.error('提交失敗: ' + e.message)
   } finally {
       loading.value = false
   }
@@ -480,12 +481,8 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
              </div>
           </div>
 
-          <!-- Submission -->
+             <!-- Submission -->
           <div class="pt-4 border-t border-zinc-100">
-             <div v-if="errorMsg" class="text-red-600 text-sm bg-red-50 p-3 rounded border border-red-100 flex items-center gap-2 mb-4">
-               <span class="font-bold">!</span> {{ errorMsg }}
-             </div>
-
              <button 
                @click="submitOrder" 
                :disabled="loading"

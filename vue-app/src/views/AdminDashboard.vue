@@ -208,27 +208,57 @@ async function fetchInventory() {
 // Watch for tab change to fetch inventory
 // Watch for tab change is combined below
 
-async function addItem() {
-    const payload = {
-        custom_id: newItem.value.custom_id,
-        name: newItem.value.name,
-        category: newItem.value.category,
-        total_stock: newItem.value.total_stock,
-        type: activeTab.value === 'CONSUMABLES' ? 'CONSUMABLE' : 'EQUIPMENT'
-    }
-    
-    if (newItem.value.safety_stock !== null && newItem.value.safety_stock !== '') {
-        payload.safety_stock = newItem.value.safety_stock
-    }
+const addingItem = ref(false)
 
-    const { error } = await supabase.from('items').insert(payload)
-    
-    if (error) {
-        triggerToast('新增失敗: ' + error.message, 'error')
-    } else {
-        newItem.value = { custom_id: '', name: '', category: '', total_stock: 1, safety_stock: null }
-        fetchInventory()
-        triggerToast(activeTab.value === 'CONSUMABLES' ? '耗材新增成功' : '器材新增成功')
+async function addItem() {
+    if (addingItem.value) return
+    addingItem.value = true
+
+    try {
+        const trimmedId = newItem.value.custom_id ? newItem.value.custom_id.trim() : ''
+
+        // Check for duplicate custom_id if provided (Global Uniqueness Check)
+        if (trimmedId) {
+            const { data: existingList, error: checkError } = await supabase
+                .from('items')
+                .select('id')
+                .eq('custom_id', trimmedId)
+            
+            if (checkError) {
+                console.error('Check Duplicate Error:', checkError)
+                triggerToast('檢查 ID 時發生錯誤', 'error')
+                return 
+            }
+
+            if (existingList && existingList.length > 0) {
+                triggerToast('新增失敗: 此 ID 已存在', 'error')
+                return
+            }
+        }
+
+        const payload = {
+            custom_id: trimmedId || null, // Ensure empty string becomes null or stored as empty? DB likely allows null.
+            name: newItem.value.name,
+            category: newItem.value.category,
+            total_stock: newItem.value.total_stock,
+            type: activeTab.value === 'CONSUMABLES' ? 'CONSUMABLE' : 'EQUIPMENT'
+        }
+        
+        if (newItem.value.safety_stock !== null && newItem.value.safety_stock !== '') {
+            payload.safety_stock = newItem.value.safety_stock
+        }
+
+        const { error } = await supabase.from('items').insert(payload)
+        
+        if (error) {
+            triggerToast('新增失敗: ' + error.message, 'error')
+        } else {
+            newItem.value = { custom_id: '', name: '', category: '', total_stock: 1, safety_stock: null }
+            fetchInventory()
+            triggerToast(activeTab.value === 'CONSUMABLES' ? '耗材新增成功' : '器材新增成功')
+        }
+    } finally {
+        addingItem.value = false
     }
 }
 
@@ -382,8 +412,7 @@ async function addUser() {
         username: newUser.value.username,
         name: newUser.value.name,
         password: newUser.value.password,
-        role: newUser.value.role,
-        department: 'General' // Default for now
+        role: newUser.value.role
     })
     
     if (error) {
@@ -415,6 +444,43 @@ async function deleteUser(userId) {
 }
 
 
+
+// --- History Export ---
+function exportHistoryExcel() {
+    const historyOrders = orders.value.filter(o => ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status))
+    
+    if (historyOrders.length === 0) {
+        triggerToast('無歷史紀錄可匯出', 'error')
+        return
+    }
+
+    const data = historyOrders.map(order => {
+        // Format items string
+        const itemsStr = order.order_items.map(oi => {
+           return `${oi.item_name_snapshot} x${oi.quantity}`
+        }).join(', ')
+
+        return {
+            '申請日期': new Date(order.created_at).toLocaleDateString(),
+            '申請人': order.applicant_name,
+            '用途': order.purpose,
+            '物品內容': itemsStr,
+            '借用日期': order.start_date || '-',
+            '歸還日期': order.expected_return_date || '-',
+            '狀態': order.status === 'COMPLETED' ? '已領用' :
+                     order.status === 'RETURNED' ? '已歸還' :
+                     order.status === 'REJECTED' ? '已拒絕' :
+                     order.status === 'CANCELLED' ? '已取消' : order.status
+        }
+    })
+
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '歷史紀錄')
+    XLSX.writeFile(wb, `history_records_${new Date().toISOString().split('T')[0]}.xlsx`)
+    triggerToast('匯出成功')
+}
+// End History Export
 
 </script>
 
@@ -533,8 +599,8 @@ async function deleteUser(userId) {
             <input v-model.number="newItem.safety_stock" type="number" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="選填">
           </div>
           <div class="md:col-span-6 flex justify-end mt-2">
-             <button @click="addItem" :disabled="!newItem.name || !newItem.category" class="h-10 px-6 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50 text-sm font-medium transition-colors flex items-center justify-center">
-                {{ activeTab === 'CONSUMABLES' ? '新增耗材' : '新增器材' }}
+             <button @click="addItem" :disabled="!newItem.name || !newItem.category || addingItem" class="h-10 px-6 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50 text-sm font-medium transition-colors flex items-center justify-center">
+                {{ addingItem ? '處理中' : (activeTab === 'CONSUMABLES' ? '新增耗材' : '新增器材') }}
              </button>
           </div>
         </div>
@@ -563,17 +629,17 @@ async function deleteUser(userId) {
       </div>
 
       <!-- Inventory List -->
-      <div class="bg-white rounded-lg border border-zinc-200 overflow-hidden">
+      <div class="bg-white rounded-lg border border-zinc-200 overflow-x-auto">
         <table class="min-w-full divide-y divide-zinc-200">
           <thead class="bg-zinc-50">
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">ID</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">名稱</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">分類</th>
-              <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">庫存</th>
-              <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">安全庫存</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">狀態</th>
-              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">操作</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">ID</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">名稱</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">分類</th>
+              <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">庫存</th>
+              <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">安全庫存</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">狀態</th>
+              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-zinc-200">
@@ -689,14 +755,14 @@ async function deleteUser(userId) {
       </div>
 
       <!-- Users List -->
-      <div class="bg-white rounded-lg border border-zinc-200 overflow-hidden">
+      <div class="bg-white rounded-lg border border-zinc-200 overflow-x-auto">
         <table class="min-w-full divide-y divide-zinc-200">
           <thead class="bg-zinc-50">
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">姓名</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">帳號</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">角色</th>
-              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">操作</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">姓名</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">帳號</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">角色</th>
+              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-zinc-200">
@@ -760,6 +826,13 @@ async function deleteUser(userId) {
     <!-- Order List (Only show when NOT in Inventory or Users tab) -->
     <div v-if="!['OVERVIEW', 'INVENTORY', 'USERS', 'CONSUMABLES'].includes(activeTab) && !loading" class="space-y-4">
       
+       <!-- History Actions (Only for History Tab) -->
+       <div v-if="activeTab === 'HISTORY'" class="flex justify-end mb-2">
+          <button @click="exportHistoryExcel" class="flex items-center justify-center gap-2 bg-white text-zinc-900 border border-zinc-200 px-4 py-2 rounded-md shadow-sm hover:bg-zinc-50 transition text-sm font-medium">
+             <ArrowDownTrayIcon class="w-4 h-4" /> 匯出 Excel
+          </button>
+       </div>
+      
        <!-- Empty State -->
        <div v-if="orders.filter(o => activeTab === 'HISTORY' ? ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status) : o.status === activeTab).length === 0" class="text-center py-12 bg-zinc-50 rounded-lg border border-dashed border-zinc-300">
          <p class="text-zinc-500">目前沒有資料</p>
@@ -776,7 +849,6 @@ async function deleteUser(userId) {
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-2">
               <span class="font-bold text-lg text-zinc-900">{{ order.applicant_name }}</span>
-              <span class="text-sm text-zinc-500" v-if="order.department && order.department !== 'N/A'">({{ order.department }})</span>
               
               <span class="px-2 py-0.5 rounded-md text-xs font-bold border ml-2" 
                 :class="{

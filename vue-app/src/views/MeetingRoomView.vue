@@ -2,12 +2,20 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useCartStore } from '../stores/cart'
-import { PlusIcon, UserGroupIcon } from '@heroicons/vue/20/solid'
+import { PlusIcon } from '@heroicons/vue/20/solid'
+import { CalendarDaysIcon } from '@heroicons/vue/24/outline'
+import ScheduleModal from '../components/ScheduleModal.vue'
+import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
 
 const items = ref([])
 const bookings = ref([])
 const loading = ref(true)
 const cart = useCartStore()
+
+// Modal State
+const showScheduleModal = ref(false)
+const selectedRoomName = ref('')
+const selectedBookings = ref([])
 
 async function fetchRooms() {
   loading.value = true
@@ -50,7 +58,8 @@ async function fetchBookings() {
     else bookings.value = data
 }
 
-function getRoomBookings(item) {
+// Helper to filter bookings for a specific room (Shared Logic)
+function filterBookingsForRoom(item, limit = null) {
     if (!bookings.value.length) return []
 
     const conflictMap = {
@@ -59,7 +68,6 @@ function getRoomBookings(item) {
         '會議室A+B': ['會議室A', '會議室B', '會議室A+B']
     }
     
-    // Determine my key
     let myKey = ''
     if (item.name.includes('A+B')) myKey = '會議室A+B'
     else if (item.name.includes('A')) myKey = '會議室A'
@@ -69,16 +77,30 @@ function getRoomBookings(item) {
 
     const relevantKeywords = conflictMap[myKey]
 
-    return bookings.value.filter(booking => {
-        // Check if ANY item in this booking matches relevant keywords
+    const filtered = bookings.value.filter(booking => {
+        // Must have valid time slots (Exclude equipment orders)
+        if (!booking.start_time || !booking.end_time) return false
+
         return booking.order_items.some(oi => {
-             // Simply check inclusion
              if (oi.item_name_snapshot.includes('A+B')) return relevantKeywords.includes('會議室A+B')
              if (oi.item_name_snapshot.includes('A') && !oi.item_name_snapshot.includes('B')) return relevantKeywords.includes('會議室A')
              if (oi.item_name_snapshot.includes('B') && !oi.item_name_snapshot.includes('A')) return relevantKeywords.includes('會議室B')
              return false
         })
-    }).slice(0, 5) // Limit to 5
+    })
+    
+    return limit ? filtered.slice(0, limit) : filtered
+}
+
+// For Card Display (Limited)
+function getRoomBookings(item) {
+    return filterBookingsForRoom(item, 5)
+}
+
+function openSchedule(item) {
+    selectedRoomName.value = item.name
+    selectedBookings.value = filterBookingsForRoom(item) // No limit
+    showScheduleModal.value = true
 }
 
 onMounted(() => {
@@ -113,15 +135,12 @@ onMounted(() => {
 
     <!-- Grid -->
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-for="item in items" :key="item.id" class="group bg-white rounded-lg border border-zinc-200 p-5 flex flex-col justify-between hover:border-zinc-300 transition-colors h-[420px]">
+      <div v-for="item in items" :key="item.id" class="group bg-white rounded-lg border border-zinc-200 p-5 flex flex-col justify-between hover:border-zinc-300 transition-colors h-[480px]">
         
         <!-- Info -->
         <div class="mb-4">
           <div class="flex justify-between items-start mb-3">
              <!-- Category Tag Removed -->
-             <div class="text-[10px] font-medium text-zinc-500 border border-zinc-200 px-2 py-0.5 rounded bg-zinc-50 ml-auto">
-                可預約數: {{ item.total_stock }}
-             </div>
           </div>
           <h3 class="text-lg font-bold text-zinc-900 mb-1 leading-tight">{{ item.name }}</h3>
           <p class="text-sm text-zinc-500 mb-4 h-10">
@@ -129,24 +148,28 @@ onMounted(() => {
           </p>
           
            <!-- Booking Schedule -->
-           <div class="bg-zinc-50 rounded-md border border-zinc-100 p-3 h-[180px] overflow-hidden flex flex-col">
-              <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                 📅 近期預約
+           <div class="mt-6 flex-1 flex flex-col h-[180px] overflow-hidden">
+              <h4 class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                 <CalendarDaysIcon class="w-3 h-3" />
+                 近期預約
               </h4>
               
-              <div v-if="getRoomBookings(item).length === 0" class="flex-1 flex items-center justify-center text-xs text-zinc-400">
+              <div v-if="getRoomBookings(item).length === 0" class="flex-1 flex items-center justify-center text-xs text-zinc-400 font-medium">
                  目前無預約
               </div>
 
-              <div v-else class="space-y-2 overflow-y-auto pr-1 custom-scrollbar">
-                 <div v-for="booking in getRoomBookings(item)" :key="booking.id" class="text-xs border-b border-zinc-200/50 last:border-0 pb-1.5 last:pb-0">
-                    <div class="flex justify-between items-center text-zinc-900 font-medium mb-0.5">
-                       <span>{{ booking.applicant_name }}</span>
-                       <span class="font-mono bg-white px-1 rounded border border-zinc-100 text-[10px]">{{ booking.start_time }}-{{ booking.end_time }}</span>
+              <div v-else class="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-3">
+                 <div v-for="booking in getRoomBookings(item)" :key="booking.id" class="flex justify-between items-start group/item">
+                    <div>
+                       <div class="text-sm font-medium text-zinc-900 leading-none mb-1">{{ booking.applicant_name }}</div>
+                       <div class="text-[10px] text-zinc-400 font-mono">{{ booking.start_date }}</div>
                     </div>
-                    <div class="text-zinc-500 text-[10px] flex justify-between">
-                       <span>{{ booking.start_date }}</span>
-                       <span v-if="booking.order_items.some(oi => oi.item_name_snapshot.includes('A+B')) && !item.name.includes('A+B')" class="text-orange-500 bg-orange-50 px-1 rounded">
+                    
+                    <div class="text-right">
+                        <div class="font-mono text-xs text-zinc-600 font-medium">
+                            {{ booking.start_time }}-{{ booking.end_time }}
+                        </div>
+                         <span v-if="booking.order_items.some(oi => oi.item_name_snapshot.includes('A+B')) && !item.name.includes('A+B')" class="text-[9px] text-orange-600 bg-orange-50 px-1 py-0.5 rounded mt-0.5 inline-block">
                           ( A+B )
                        </span>
                     </div>
@@ -157,13 +180,23 @@ onMounted(() => {
         </div>
 
         <!-- Action -->
-        <button 
-          @click="cart.addItem(item)"
-          class="w-full mt-auto flex items-center justify-center gap-2 bg-zinc-900 text-white border border-transparent py-2 rounded-md hover:bg-zinc-800 transition-all text-sm font-medium opacity-0 group-hover:opacity-100"
-        >
-          <PlusIcon class="w-4 h-4" />
-          加入預約清單
-        </button>
+        <div class="mt-auto flex flex-col gap-3">
+            <button 
+              @click="openSchedule(item)"
+              class="w-full flex items-center justify-center gap-2 bg-white text-zinc-700 border border-zinc-200 py-2.5 rounded-md hover:bg-zinc-50 hover:text-zinc-900 transition-all text-sm font-medium"
+            >
+              <CalendarDaysIcon class="w-4 h-4" />
+              查看一週檔期
+            </button>
+            
+            <button 
+              @click="cart.addItem(item)"
+              class="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white border border-transparent py-2.5 rounded-md hover:bg-zinc-800 transition-all text-sm font-medium opacity-0 group-hover:opacity-100"
+            >
+              <PlusIcon class="w-4 h-4" />
+              加入預約清單
+            </button>
+        </div>
       </div>
     </div>
 
@@ -171,6 +204,14 @@ onMounted(() => {
     <div v-if="!loading && items.length === 0" class="text-center py-12 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">
         <p class="text-zinc-500">目前沒有開放的空間。</p>
     </div>
+
+    <!-- Schedule Modal -->
+    <ScheduleModal 
+      :is-open="showScheduleModal"
+      :room-name="selectedRoomName"
+      :bookings="selectedBookings"
+      @close="showScheduleModal = false"
+    />
 
   </div>
 </template>

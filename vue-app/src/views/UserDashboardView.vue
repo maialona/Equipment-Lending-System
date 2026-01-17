@@ -67,51 +67,53 @@ onMounted(() => {
           </RouterLink>
        </div>
 
-       <table v-else class="min-w-full divide-y divide-zinc-200">
-         <thead class="bg-zinc-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">日期</th>
-              <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">項目</th>
-              <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">用途</th>
-              <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">狀態</th>
-            </tr>
-         </thead>
-         <tbody class="divide-y divide-zinc-100 bg-white">
-            <tr v-for="order in myOrders" :key="order.id" class="hover:bg-zinc-50 transition-colors">
-               <td class="px-6 py-4 text-sm text-zinc-900">
-                  <div class="font-medium">{{ order.start_date }} ~ {{ order.end_date }}</div>
-                  <div v-if="order.start_time" class="text-xs text-zinc-500 mt-0.5 font-mono">{{ order.start_time }} - {{ order.end_time }}</div>
-               </td>
-               <td class="px-6 py-4 text-sm text-zinc-600">
-                  <ul class="space-y-1">
-                     <li v-for="item in order.order_items" :key="item.id">
-                        {{ item.item_name_snapshot }} <span class="text-zinc-400 text-xs ml-1">x{{ item.quantity }}</span>
-                     </li>
-                  </ul>
-               </td>
-               <td class="px-6 py-4 text-sm text-zinc-500 max-w-xs truncate" :title="order.purpose">
-                  {{ order.purpose }}
-               </td>
-               <td class="px-6 py-4">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border"
-                    :class="{
-                      'bg-white border-zinc-300 text-zinc-700': order.status === 'PENDING',
-                      'bg-zinc-900 text-white border-zinc-900': order.status === 'APPROVED' || order.status === 'COMPLETED',
-                      'bg-zinc-100 text-zinc-400 border-zinc-200 line-through': order.status === 'REJECTED' || order.status === 'CANCELLED',
-                      'bg-white text-zinc-500 border-zinc-200': order.status === 'RETURNED'
-                    }">
-                     {{ 
-                        order.status === 'PENDING' ? '待審核' :
-                        order.status === 'APPROVED' ? '已核准' :
-                        order.status === 'COMPLETED' ? '已領用' :
-                        order.status === 'REJECTED' ? '已拒絕' :
-                        order.status === 'RETURNED' ? '已歸還' : order.status
-                     }}
-                  </span>
-               </td>
-            </tr>
-         </tbody>
-       </table>
+       <div v-else class="overflow-x-auto">
+         <table class="min-w-full divide-y divide-zinc-200">
+           <thead class="bg-zinc-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">日期</th>
+                <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">項目</th>
+                <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">用途</th>
+                <th class="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">狀態</th>
+              </tr>
+           </thead>
+           <tbody class="divide-y divide-zinc-100 bg-white">
+              <tr v-for="order in myOrders" :key="order.id" class="hover:bg-zinc-50 transition-colors">
+                 <td class="px-6 py-4 text-sm text-zinc-900 whitespace-nowrap">
+                    <div class="font-medium">{{ order.start_date }} ~ {{ order.end_date }}</div>
+                    <div v-if="order.start_time" class="text-xs text-zinc-500 mt-0.5 font-mono">{{ order.start_time }} - {{ order.end_time }}</div>
+                 </td>
+                 <td class="px-6 py-4 text-sm text-zinc-600 min-w-[200px]">
+                    <ul class="space-y-1">
+                       <li v-for="item in order.order_items" :key="item.id">
+                          {{ item.item_name_snapshot }} <span class="text-zinc-400 text-xs ml-1">x{{ item.quantity }}</span>
+                       </li>
+                    </ul>
+                 </td>
+                 <td class="px-6 py-4 text-sm text-zinc-500 max-w-xs truncate" :title="order.purpose">
+                    {{ order.purpose }}
+                 </td>
+                 <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border"
+                      :class="{
+                        'bg-white border-zinc-300 text-zinc-700': order.status === 'PENDING',
+                        'bg-zinc-900 text-white border-zinc-900': order.status === 'APPROVED' || order.status === 'COMPLETED',
+                        'bg-zinc-100 text-zinc-400 border-zinc-200 line-through': order.status === 'REJECTED' || order.status === 'CANCELLED',
+                        'bg-white text-zinc-500 border-zinc-200': order.status === 'RETURNED'
+                      }">
+                       {{ 
+                          order.status === 'PENDING' ? '待審核' :
+                          order.status === 'APPROVED' ? '已核准' :
+                          order.status === 'COMPLETED' ? '已領用' :
+                          order.status === 'REJECTED' ? '已拒絕' :
+                          order.status === 'RETURNED' ? '已歸還' : order.status
+                       }}
+                    </span>
+                 </td>
+              </tr>
+           </tbody>
+         </table>
+       </div>
     </div>
 
 
