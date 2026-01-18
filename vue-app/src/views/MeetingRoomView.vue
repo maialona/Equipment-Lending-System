@@ -113,17 +113,17 @@ onMounted(() => {
   <div>
     <!-- Header -->
     <div class="mb-8 text-center sm:text-left">
-      <h1 class="text-3xl font-bold text-gray-900 mb-2">空間預約</h1>
-      <p class="text-gray-500">選擇您需要的會議室。</p>
+      <h1 class="text-3xl font-bold text-foreground mb-2">空間預約</h1>
+      <p class="text-muted-foreground">選擇您需要的會議室。</p>
     </div>
 
     <!-- Loading State (Skeleton) -->
     <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="n in 3" :key="n" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between h-[220px]">
+      <div v-for="n in 3" :key="n" class="bg-card rounded-xl shadow-sm border border-border p-6 flex flex-col justify-between h-[220px]">
         <div>
            <div class="flex justify-between items-start mb-4">
-             <Skeleton class="h-5 w-20 bg-zinc-100" /> 
-             <Skeleton class="h-5 w-16 bg-zinc-100" />
+             <Skeleton class="h-5 w-20 bg-muted" /> 
+             <Skeleton class="h-5 w-16 bg-muted" />
            </div>
            <Skeleton class="h-7 w-3/4 mb-3" /> <!-- Larger Title for Rooms -->
            <Skeleton class="h-4 w-full mb-1" />
@@ -135,21 +135,21 @@ onMounted(() => {
 
     <!-- Grid -->
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-for="item in items" :key="item.id" class="group bg-white rounded-lg border border-zinc-200 p-5 flex flex-col justify-between hover:border-zinc-300 transition-colors h-[480px]">
+      <div v-for="item in items" :key="item.id" class="group bg-card rounded-lg border border-border p-5 flex flex-col justify-between hover:border-input transition-colors h-[480px]">
         
         <!-- Info -->
         <div class="mb-4">
           <div class="flex justify-between items-start mb-3">
              <!-- Category Tag Removed -->
           </div>
-          <h3 class="text-lg font-bold text-zinc-900 mb-1 leading-tight">{{ item.name }}</h3>
-          <p class="text-sm text-zinc-500 mb-4 h-10">
+          <h3 class="text-lg font-bold text-foreground mb-1 leading-tight">{{ item.name }}</h3>
+          <p class="text-sm text-muted-foreground mb-4 h-10">
              {{ item.name.includes('A+B') ? '可投影。適合大型會議或培訓。' : (item.name.includes('A') ? '可投影。適合會議、討論。' : '無法投影。適合小組討論或面試。') }}
           </p>
           
            <!-- Booking Schedule -->
            <div class="mt-6 flex-1 flex flex-col h-[180px] overflow-hidden">
-              <h4 class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <h4 class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
                  <CalendarDaysIcon class="w-3 h-3" />
                  近期預約
               </h4>
@@ -161,12 +161,12 @@ onMounted(() => {
               <div v-else class="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-3">
                  <div v-for="booking in getRoomBookings(item)" :key="booking.id" class="flex justify-between items-start group/item">
                     <div>
-                       <div class="text-sm font-medium text-zinc-900 leading-none mb-1">{{ booking.applicant_name }}</div>
-                       <div class="text-[10px] text-zinc-400 font-mono">{{ booking.start_date }}</div>
+                       <div class="text-sm font-medium text-foreground leading-none mb-1">{{ booking.applicant_name }}</div>
+                       <div class="text-[10px] text-muted-foreground font-mono">{{ booking.start_date }}</div>
                     </div>
                     
-                    <div class="text-right">
-                        <div class="font-mono text-xs text-zinc-600 font-medium">
+                     <div class="text-right">
+                        <div class="font-mono text-xs text-muted-foreground font-medium">
                             {{ booking.start_time }}-{{ booking.end_time }}
                         </div>
                          <span v-if="booking.order_items.some(oi => oi.item_name_snapshot.includes('A+B')) && !item.name.includes('A+B')" class="text-[9px] text-orange-600 bg-orange-50 px-1 py-0.5 rounded mt-0.5 inline-block">
@@ -183,7 +183,7 @@ onMounted(() => {
         <div class="mt-auto flex flex-col gap-3">
             <button 
               @click="openSchedule(item)"
-              class="w-full flex items-center justify-center gap-2 bg-white text-zinc-700 border border-zinc-200 py-2.5 rounded-md hover:bg-zinc-50 hover:text-zinc-900 transition-all text-sm font-medium"
+              class="w-full flex items-center justify-center gap-2 bg-card text-foreground border border-border py-2.5 rounded-md hover:bg-muted hover:text-foreground transition-all text-sm font-medium"
             >
               <CalendarDaysIcon class="w-4 h-4" />
               查看一週檔期
@@ -191,7 +191,7 @@ onMounted(() => {
             
             <button 
               @click="cart.addItem(item)"
-              class="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white border border-transparent py-2.5 rounded-md hover:bg-zinc-800 transition-all text-sm font-medium opacity-0 group-hover:opacity-100"
+              class="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground border border-transparent py-2.5 rounded-md hover:bg-primary/90 transition-all text-sm font-medium opacity-0 group-hover:opacity-100"
             >
               <PlusIcon class="w-4 h-4" />
               加入預約清單

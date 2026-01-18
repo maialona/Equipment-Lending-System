@@ -8,7 +8,7 @@ const route = useRoute()
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900 font-sans">
+  <div class="min-h-screen bg-background text-foreground font-sans">
     <Navbar v-if="route.path !== '/'" />
     <main class="container mx-auto px-4 py-6 max-w-5xl">
       <RouterView />

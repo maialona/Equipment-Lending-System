@@ -11,7 +11,7 @@ import {
   ArrowUpTrayIcon,
   ArrowDownTrayIcon
 } from '@heroicons/vue/20/solid'
-import { MoreHorizontal, Trash, Power, FileEdit, Search, LayoutDashboard } from 'lucide-vue-next'
+import { MoreHorizontal, Trash, Power, FileEdit, Search, LayoutDashboard, ArrowUp, ArrowDown } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import * as XLSX from 'xlsx'
@@ -146,6 +146,7 @@ async function fetchOrders() {
 // --- Inventory Management ---
 const inventoryItems = ref([])
 const searchQuery = ref('')
+// New Item Form State
 const newItem = ref({
   custom_id: '',
   name: '',
@@ -153,6 +154,44 @@ const newItem = ref({
   total_stock: 1,
   safety_stock: null
 })
+
+// --- Sorting State ---
+const inventorySort = ref({ column: 'created_at', direction: 'desc' })
+const userSort = ref({ column: 'created_at', direction: 'desc' })
+
+function handleSort(type, column) {
+    const state = type === 'INVENTORY' ? inventorySort : userSort
+    if (state.value.column === column) {
+        state.value.direction = state.value.direction === 'asc' ? 'desc' : 'asc'
+    } else {
+        state.value.column = column
+        state.value.direction = 'asc'
+    }
+}
+
+function sortData(data, sortState) {
+    const { column, direction } = sortState
+    if (!column) return data
+    
+    return [...data].sort((a, b) => {
+        let valA = a[column]
+        let valB = b[column]
+        
+        // Handle null/undefined
+        if (valA === null || valA === undefined) valA = ''
+        if (valB === null || valB === undefined) valB = ''
+        
+        // Numeric Check
+        if (typeof valA === 'number' && typeof valB === 'number') {
+            return direction === 'asc' ? valA - valB : valB - valA
+        }
+        
+        // String Compare
+        return direction === 'asc'
+            ? String(valA).localeCompare(String(valB), 'zh-Hant')
+            : String(valB).localeCompare(String(valA), 'zh-Hant')
+    })
+}
 
 function handleNavigation({ status }) {
     if (status === 'PENDING') {
@@ -169,13 +208,18 @@ const currentInventoryPage = ref(1)
 const itemsPerPage = ref(10)
 
 const filteredInventory = computed(() => {
-  if (!searchQuery.value) return inventoryItems.value
-  const lowerQuery = searchQuery.value.toLowerCase()
-  return inventoryItems.value.filter(item => 
-    (item.name && item.name.toLowerCase().includes(lowerQuery)) ||
-    (item.custom_id && item.custom_id.toLowerCase().includes(lowerQuery)) ||
-    (item.category && item.category.toLowerCase().includes(lowerQuery))
-  )
+  let items = inventoryItems.value
+  
+  if (searchQuery.value) {
+      const lowerQuery = searchQuery.value.toLowerCase()
+      items = items.filter(item => 
+        (item.name && item.name.toLowerCase().includes(lowerQuery)) ||
+        (item.custom_id && item.custom_id.toLowerCase().includes(lowerQuery)) ||
+        (item.category && item.category.toLowerCase().includes(lowerQuery))
+      )
+  }
+  
+  return sortData(items, inventorySort.value)
 })
 
 const totalInventoryPages = computed(() => Math.ceil(filteredInventory.value.length / itemsPerPage.value))
@@ -374,10 +418,14 @@ const newUser = ref({
 // User Pagination
 const currentUserPage = ref(1)
 const totalUserPages = computed(() => Math.ceil(users.value.length / itemsPerPage.value))
+const sortedUsers = computed(() => {
+    return sortData(users.value, userSort.value)
+})
+
 const paginatedUsers = computed(() => {
     const start = (currentUserPage.value - 1) * itemsPerPage.value
     const end = start + itemsPerPage.value
-    return users.value.slice(start, end)
+    return sortedUsers.value.slice(start, end)
 })
 
 async function fetchUsers() {
@@ -488,16 +536,16 @@ function exportHistoryExcel() {
   <div>
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-zinc-900 tracking-tight">後台管理系統</h1>
+      <h1 class="text-2xl font-bold text-foreground tracking-tight">後台管理系統</h1>
     </div>
 
 
     <!-- Tabs -->
-    <div class="border-b border-zinc-200 mb-6">
+    <div class="border-b border-border mb-6">
       <nav class="-mb-px flex space-x-8 overflow-x-auto">
         <button 
           @click="activeTab = 'OVERVIEW'"
-          :class="activeTab === 'OVERVIEW' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
+          :class="activeTab === 'OVERVIEW' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors"
         >
           總覽
@@ -505,29 +553,29 @@ function exportHistoryExcel() {
 
         <button 
           @click="activeTab = 'PENDING'"
-          :class="activeTab === 'PENDING' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
+          :class="activeTab === 'PENDING' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors"
         >
           待審核
-          <span v-if="orders.filter(o => o.status === 'PENDING').length" class="bg-zinc-100 text-zinc-700 py-0.5 px-2 rounded-full text-xs border border-zinc-200">
+          <span v-if="orders.filter(o => o.status === 'PENDING').length" class="bg-secondary text-secondary-foreground py-0.5 px-2 rounded-full text-xs border border-border">
             {{ orders.filter(o => o.status === 'PENDING').length }}
           </span>
         </button>
         
         <button 
           @click="activeTab = 'APPROVED'"
-          :class="activeTab === 'APPROVED' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
+          :class="activeTab === 'APPROVED' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors"
         >
           借用中
-          <span v-if="orders.filter(o => o.status === 'APPROVED').length" class="bg-zinc-100 text-zinc-700 py-0.5 px-2 rounded-full text-xs border border-zinc-200">
+          <span v-if="orders.filter(o => o.status === 'APPROVED').length" class="bg-secondary text-secondary-foreground py-0.5 px-2 rounded-full text-xs border border-border">
             {{ orders.filter(o => o.status === 'APPROVED').length }}
           </span>
         </button>
 
         <button 
           @click="activeTab = 'HISTORY'"
-          :class="activeTab === 'HISTORY' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
+          :class="activeTab === 'HISTORY' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
         >
           歷史紀錄
@@ -535,7 +583,7 @@ function exportHistoryExcel() {
 
         <button 
           @click="activeTab = 'INVENTORY'"
-          :class="activeTab === 'INVENTORY' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
+          :class="activeTab === 'INVENTORY' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors"
         >
           器材管理
@@ -543,7 +591,7 @@ function exportHistoryExcel() {
 
         <button 
           @click="activeTab = 'CONSUMABLES'"
-          :class="activeTab === 'CONSUMABLES' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
+          :class="activeTab === 'CONSUMABLES' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors"
         >
           耗材管理
@@ -551,7 +599,7 @@ function exportHistoryExcel() {
         
         <button 
           @click="activeTab = 'USERS'"
-          :class="activeTab === 'USERS' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
+          :class="activeTab === 'USERS' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors"
         >
           人員管理
@@ -575,31 +623,31 @@ function exportHistoryExcel() {
 
 
       <!-- Add Item Form -->
-      <div class="bg-white p-6 rounded-lg border border-zinc-200 mb-6 shadow-sm">
-        <h3 class="text-base font-bold text-zinc-900 mb-4">{{ activeTab === 'CONSUMABLES' ? '新增耗材' : '新增器材' }}</h3>
+      <div class="bg-card p-6 rounded-lg border border-border mb-6 shadow-sm">
+        <h3 class="text-base font-bold text-foreground mb-4">{{ activeTab === 'CONSUMABLES' ? '新增耗材' : '新增器材' }}</h3>
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
           <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">ID</label>
-            <input v-model="newItem.custom_id" type="text" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="選填">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">ID</label>
+            <input v-model="newItem.custom_id" type="text" class="h-10 w-full border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="選填">
           </div>
           <div class="md:col-span-2">
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">{{ activeTab === 'CONSUMABLES' ? '耗材名稱' : '器材名稱' }}</label>
-            <input v-model="newItem.name" type="text" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="必填">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">{{ activeTab === 'CONSUMABLES' ? '耗材名稱' : '器材名稱' }}</label>
+            <input v-model="newItem.name" type="text" class="h-10 w-full border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="必填">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">分類</label>
-            <input v-model="newItem.category" type="text" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="必填">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">分類</label>
+            <input v-model="newItem.category" type="text" class="h-10 w-full border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="必填">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">總庫存</label>
-            <input v-model.number="newItem.total_stock" type="number" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="1">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">總庫存</label>
+            <input v-model.number="newItem.total_stock" type="number" class="h-10 w-full border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="1">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">安全庫存量</label>
-            <input v-model.number="newItem.safety_stock" type="number" class="h-10 w-full border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="選填">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">安全庫存量</label>
+            <input v-model.number="newItem.safety_stock" type="number" class="h-10 w-full border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="選填">
           </div>
           <div class="md:col-span-6 flex justify-end mt-2">
-             <button @click="addItem" :disabled="!newItem.name || !newItem.category || addingItem" class="h-10 px-6 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50 text-sm font-medium transition-colors flex items-center justify-center">
+             <button @click="addItem" :disabled="!newItem.name || !newItem.category || addingItem" class="h-10 px-6 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium transition-colors flex items-center justify-center">
                 {{ addingItem ? '處理中' : (activeTab === 'CONSUMABLES' ? '新增耗材' : '新增器材') }}
              </button>
           </div>
@@ -611,17 +659,17 @@ function exportHistoryExcel() {
         <!-- Search -->
         <div class="relative w-full sm:w-64">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search class="h-4 w-4 text-zinc-400" />
+                <Search class="h-4 w-4 text-muted-foreground" />
             </div>
-            <input v-model="searchQuery" type="text" class="pl-10 h-10 w-full border-zinc-300 rounded-md shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm" placeholder="搜尋名稱、ID...">
+            <input v-model="searchQuery" type="text" class="pl-10 h-10 w-full border border-input bg-background rounded-md shadow-sm focus:border-ring focus:ring-ring sm:text-sm text-foreground" placeholder="搜尋名稱、ID...">
         </div>
 
         <!-- Excel Actions -->
         <div class="flex gap-2 w-full sm:w-auto">
-            <button @click="exportExcel" class="flex-1 sm:flex-none h-10 flex items-center justify-center gap-2 bg-white text-zinc-900 border border-zinc-200 px-4 rounded-md shadow-sm hover:bg-zinc-50 transition text-sm font-medium">
+            <button @click="exportExcel" class="flex-1 sm:flex-none h-10 flex items-center justify-center gap-2 bg-card text-foreground border border-border px-4 rounded-md shadow-sm hover:bg-muted transition text-sm font-medium">
                 <ArrowDownTrayIcon class="w-4 h-4" /> 匯出 Excel
             </button>
-            <button @click="triggerFileInput" class="flex-1 sm:flex-none h-10 flex items-center justify-center gap-2 bg-white text-zinc-900 border border-zinc-200 px-4 rounded-md shadow-sm hover:bg-zinc-50 transition text-sm font-medium">
+            <button @click="triggerFileInput" class="flex-1 sm:flex-none h-10 flex items-center justify-center gap-2 bg-card text-foreground border border-border px-4 rounded-md shadow-sm hover:bg-muted transition text-sm font-medium">
                 <ArrowUpTrayIcon class="w-4 h-4" /> 匯入 Excel
             </button>
             <input type="file" ref="fileInputRef" @change="handleFileUpload" accept=".xlsx, .xls" class="hidden" />
@@ -629,39 +677,75 @@ function exportHistoryExcel() {
       </div>
 
       <!-- Inventory List -->
-      <div class="bg-white rounded-lg border border-zinc-200 overflow-x-auto">
-        <table class="min-w-full divide-y divide-zinc-200">
-          <thead class="bg-zinc-50">
+      <div class="bg-card rounded-lg border border-border overflow-x-auto">
+        <table class="min-w-full divide-y divide-border">
+          <thead class="bg-muted/50">
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">ID</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">名稱</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">分類</th>
-              <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">庫存</th>
-              <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">安全庫存</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">狀態</th>
-              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">操作</th>
+              <th @click="handleSort('INVENTORY', 'custom_id')" scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-zinc-100 transition-colors select-none">
+                  <div class="flex items-center gap-1">
+                      ID
+                      <ArrowUp v-if="inventorySort.column === 'custom_id' && inventorySort.direction === 'asc'" class="w-3 h-3 text-zinc-900" />
+                      <ArrowDown v-if="inventorySort.column === 'custom_id' && inventorySort.direction === 'desc'" class="w-3 h-3 text-zinc-900" />
+                  </div>
+              </th>
+              <th @click="handleSort('INVENTORY', 'name')" scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-zinc-100 transition-colors select-none">
+                  <div class="flex items-center gap-1">
+                      名稱
+                      <ArrowUp v-if="inventorySort.column === 'name' && inventorySort.direction === 'asc'" class="w-3 h-3 text-zinc-900" />
+                      <ArrowDown v-if="inventorySort.column === 'name' && inventorySort.direction === 'desc'" class="w-3 h-3 text-zinc-900" />
+                  </div>
+              </th>
+              <th @click="handleSort('INVENTORY', 'category')" scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-zinc-100 transition-colors select-none">
+                  <div class="flex items-center gap-1">
+                      分類
+                      <ArrowUp v-if="inventorySort.column === 'category' && inventorySort.direction === 'asc'" class="w-3 h-3 text-zinc-900" />
+                      <ArrowDown v-if="inventorySort.column === 'category' && inventorySort.direction === 'desc'" class="w-3 h-3 text-zinc-900" />
+                  </div>
+              </th>
+              <th @click="handleSort('INVENTORY', 'total_stock')" scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-zinc-100 transition-colors select-none">
+                  <div class="flex items-center justify-center gap-1">
+                      庫存
+                      <ArrowUp v-if="inventorySort.column === 'total_stock' && inventorySort.direction === 'asc'" class="w-3 h-3 text-zinc-900" />
+                      <ArrowDown v-if="inventorySort.column === 'total_stock' && inventorySort.direction === 'desc'" class="w-3 h-3 text-zinc-900" />
+                  </div>
+              </th>
+              <th @click="handleSort('INVENTORY', 'safety_stock')" scope="col" class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-zinc-100 transition-colors select-none">
+                   <div class="flex items-center justify-center gap-1">
+                      安全庫存
+                      <ArrowUp v-if="inventorySort.column === 'safety_stock' && inventorySort.direction === 'asc'" class="w-3 h-3 text-zinc-900" />
+                      <ArrowDown v-if="inventorySort.column === 'safety_stock' && inventorySort.direction === 'desc'" class="w-3 h-3 text-zinc-900" />
+                  </div>
+              </th>
+              <th @click="handleSort('INVENTORY', 'is_active')" scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted transition-colors select-none">
+                   <div class="flex items-center gap-1">
+                      狀態
+                      <ArrowUp v-if="inventorySort.column === 'is_active' && inventorySort.direction === 'asc'" class="w-3 h-3 text-foreground" />
+                      <ArrowDown v-if="inventorySort.column === 'is_active' && inventorySort.direction === 'desc'" class="w-3 h-3 text-foreground" />
+                  </div>
+              </th>
+              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">操作</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-zinc-200">
-            <tr v-for="item in paginatedInventory" :key="item.id" class="hover:bg-zinc-50 transition-colors">
+          <tbody class="bg-card divide-y divide-border">
+            <tr v-for="item in paginatedInventory" :key="item.id" class="hover:bg-muted/50 transition-colors">
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-zinc-900 font-mono">{{ item.custom_id || '-' }}</div>
+                <div class="text-sm text-foreground font-mono">{{ item.custom_id || '-' }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-zinc-900">{{ item.name }}</div>
+                <div class="text-sm font-medium text-foreground">{{ item.name }}</div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">{{ item.category }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-zinc-900">{{ item.total_stock }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-zinc-500">{{ item.safety_stock || '-' }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{{ item.category }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-foreground">{{ item.total_stock }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-muted-foreground">{{ item.safety_stock || '-' }}</td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md border" :class="item.is_active ? 'bg-white border-zinc-300 text-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-400'">
+                <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md border" :class="item.is_active ? 'bg-secondary border-transparent text-secondary-foreground' : 'bg-muted border-transparent text-muted-foreground'">
                   <span v-if="item.is_active" class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 my-auto"></span>
                   {{ item.is_active ? '上架中' : '已下架' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <DropdownMenu>
-                  <DropdownMenuTrigger class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-zinc-100 hover:text-zinc-900 h-8 w-8 p-0">
+                  <DropdownMenuTrigger class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-muted hover:text-foreground h-8 w-8 p-0">
                     <span class="sr-only">Open menu</span>
                     <MoreHorizontal class="h-4 w-4" />
                   </DropdownMenuTrigger>
@@ -671,11 +755,11 @@ function exportHistoryExcel() {
                       <span>{{ item.is_active ? '下架' : '上架' }}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem @click="deleteItem(item.id)" class="text-red-600 focus:text-red-600 focus:bg-red-50">
+                    <DropdownMenuItem @click="deleteItem(item.id)" class="text-destructive focus:text-destructive focus:bg-destructive/10">
                       <Trash class="mr-2 h-4 w-4" />
                       <span>刪除</span>
                     </DropdownMenuItem>
-                    <!-- <DropdownMenuItem class="text-zinc-900">
+                    <!-- <DropdownMenuItem class="text-foreground">
                       <FileEdit class="mr-2 h-4 w-4" />
                       <span>編輯</span>
                     </DropdownMenuItem> -->
@@ -689,22 +773,22 @@ function exportHistoryExcel() {
 
       <!-- Pagination Footer -->
       <div v-if="filteredInventory.length > 0" class="flex items-center justify-between mt-4 px-2">
-           <div class="text-sm text-zinc-500">
+           <div class="text-sm text-muted-foreground">
                顯示 {{ (currentInventoryPage - 1) * itemsPerPage + 1 }} 到 {{ Math.min(currentInventoryPage * itemsPerPage, filteredInventory.length) }} 筆，共 {{ filteredInventory.length }} 筆
            </div>
            <div class="flex items-center gap-2">
                <button 
                 @click="currentInventoryPage--" 
                 :disabled="currentInventoryPage === 1"
-                class="px-3 py-1 text-sm font-medium border border-zinc-200 rounded-md bg-white hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-700"
+                class="px-3 py-1 text-sm font-medium border border-border rounded-md bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground"
                >
                  上一頁
                </button>
-               <span class="text-sm font-medium text-zinc-900">第 {{ currentInventoryPage }} 頁</span>
+               <span class="text-sm font-medium text-foreground">第 {{ currentInventoryPage }} 頁</span>
                <button 
                 @click="currentInventoryPage++" 
                 :disabled="currentInventoryPage >= totalInventoryPages"
-                class="px-3 py-1 text-sm font-medium border border-zinc-200 rounded-md bg-white hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-700"
+                class="px-3 py-1 text-sm font-medium border border-border rounded-md bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground"
                >
                  下一頁
                </button>
@@ -715,75 +799,87 @@ function exportHistoryExcel() {
     <!-- User Management Tab Content -->
     <div v-if="activeTab === 'USERS'">
       <!-- Add User Form -->
-      <div class="bg-white p-6 rounded-lg border border-zinc-200 mb-6 shadow-sm">
-        <h3 class="text-base font-bold text-zinc-900 mb-4">新增人員</h3>
+      <div class="bg-card p-6 rounded-lg border border-border mb-6 shadow-sm">
+        <h3 class="text-base font-bold text-foreground mb-4">新增人員</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
           <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">姓名</label>
-            <input v-model="newUser.name" type="text" class="w-full h-10 border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">姓名</label>
+            <input v-model="newUser.name" type="text" class="w-full h-10 border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">帳號</label>
-            <input v-model="newUser.username" type="text" class="w-full h-10 border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">帳號</label>
+            <input v-model="newUser.username" type="text" class="w-full h-10 border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">密碼</label>
-            <input v-model="newUser.password" type="text" class="w-full h-10 border border-zinc-200 bg-white rounded-md px-3 shadow-sm focus:border-zinc-900 focus:ring-zinc-900 sm:text-sm placeholder:text-zinc-400 transition-colors" placeholder="">
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">密碼</label>
+            <input v-model="newUser.password" type="text" class="w-full h-10 border border-input bg-background rounded-md px-3 shadow-sm focus:border-ring focus:ring-ring sm:text-sm placeholder:text-muted-foreground text-foreground transition-colors" placeholder="">
           </div>
            <!-- Removed Select -->
            <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">角色</label>
+            <label class="block text-xs font-semibold text-muted-foreground mb-1">角色</label>
             <div class="flex items-center gap-4 h-10">
                 <label class="flex items-center gap-2 cursor-pointer group">
                     <div class="relative flex items-center">
-                      <input type="checkbox" value="USER" v-model="newUser.role" class="peer h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 accent-zinc-900 transition-all cursor-pointer">
+                      <input type="checkbox" value="USER" v-model="newUser.role" class="peer h-4 w-4 rounded border-input text-primary focus:ring-ring accent-primary transition-all cursor-pointer">
                     </div>
-                    <span class="text-sm text-zinc-600 group-hover:text-zinc-900 transition-colors select-none whitespace-nowrap">一般使用者</span>
+                    <span class="text-sm text-muted-foreground group-hover:text-foreground transition-colors select-none whitespace-nowrap">一般使用者</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer group">
                     <div class="relative flex items-center">
-                      <input type="checkbox" value="ADMIN" v-model="newUser.role" class="peer h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 accent-zinc-900 transition-all cursor-pointer">
+                      <input type="checkbox" value="ADMIN" v-model="newUser.role" class="peer h-4 w-4 rounded border-input text-primary focus:ring-ring accent-primary transition-all cursor-pointer">
                     </div>
-                    <span class="text-sm text-zinc-600 group-hover:text-zinc-900 transition-colors select-none whitespace-nowrap">管理員</span>
+                    <span class="text-sm text-muted-foreground group-hover:text-foreground transition-colors select-none whitespace-nowrap">管理員</span>
                 </label>
             </div>
           </div>
           <div>
-             <button @click="addUser" :disabled="!newUser.username || !newUser.password || !newUser.name || newUser.role.length === 0" class="w-full bg-zinc-900 text-white px-4 py-2 rounded-md hover:bg-zinc-800 disabled:opacity-50 text-sm font-medium transition-colors">新增</button>
+             <button @click="addUser" :disabled="!newUser.username || !newUser.password || !newUser.name || newUser.role.length === 0" class="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium transition-colors">新增</button>
           </div>
         </div>
       </div>
 
       <!-- Users List -->
-      <div class="bg-white rounded-lg border border-zinc-200 overflow-x-auto">
-        <table class="min-w-full divide-y divide-zinc-200">
-          <thead class="bg-zinc-50">
+      <div class="bg-card rounded-lg border border-border overflow-x-auto">
+        <table class="min-w-full divide-y divide-border">
+          <thead class="bg-muted/50">
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">姓名</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">帳號</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">角色</th>
-              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">操作</th>
+              <th @click="handleSort('USERS', 'name')" scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted transition-colors select-none">
+                  <div class="flex items-center gap-1">
+                      姓名
+                      <ArrowUp v-if="userSort.column === 'name' && userSort.direction === 'asc'" class="w-3 h-3 text-foreground" />
+                      <ArrowDown v-if="userSort.column === 'name' && userSort.direction === 'desc'" class="w-3 h-3 text-foreground" />
+                  </div>
+              </th>
+              <th @click="handleSort('USERS', 'username')" scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted transition-colors select-none">
+                  <div class="flex items-center gap-1">
+                      帳號
+                      <ArrowUp v-if="userSort.column === 'username' && userSort.direction === 'asc'" class="w-3 h-3 text-foreground" />
+                      <ArrowDown v-if="userSort.column === 'username' && userSort.direction === 'desc'" class="w-3 h-3 text-foreground" />
+                  </div>
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">角色</th>
+              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">操作</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-zinc-200">
-            <tr v-for="user in paginatedUsers" :key="user.id" class="hover:bg-zinc-50 transition-colors">
+          <tbody class="bg-card divide-y divide-border">
+            <tr v-for="user in paginatedUsers" :key="user.id" class="hover:bg-muted/50 transition-colors">
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-zinc-900">{{ user.name }}</div>
+                <div class="text-sm font-medium text-foreground">{{ user.name }}</div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">{{ user.username }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{{ user.username }}</td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span v-for="role in (Array.isArray(user.role) ? user.role : [user.role])" :key="role" class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md border mr-1" :class="role === 'ADMIN' ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white border-zinc-300 text-zinc-700'">
+                <span v-for="role in (Array.isArray(user.role) ? user.role : [user.role])" :key="role" class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md border mr-1" :class="role === 'ADMIN' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground'">
                   {{ role === 'ADMIN' ? '管理員' : '一般使用者' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <DropdownMenu v-if="user.username !== 'admin'">
-                  <DropdownMenuTrigger class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-zinc-100 hover:text-zinc-900 h-8 w-8 p-0">
+                  <DropdownMenuTrigger class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-muted hover:text-foreground h-8 w-8 p-0 text-muted-foreground">
                     <span class="sr-only">Open menu</span>
                     <MoreHorizontal class="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem @click="deleteUser(user.id)" class="text-red-600 focus:text-red-600 focus:bg-red-50">
+                    <DropdownMenuItem @click="deleteUser(user.id)" class="text-destructive focus:text-destructive focus:bg-destructive/10">
                       <Trash class="mr-2 h-4 w-4" />
                       <span>刪除</span>
                     </DropdownMenuItem>
@@ -797,22 +893,22 @@ function exportHistoryExcel() {
 
       <!-- Pagination Footer -->
       <div v-if="users.length > 0" class="flex items-center justify-between mt-4 px-2">
-           <div class="text-sm text-zinc-500">
+           <div class="text-sm text-muted-foreground">
                顯示 {{ (currentUserPage - 1) * itemsPerPage + 1 }} 到 {{ Math.min(currentUserPage * itemsPerPage, users.length) }} 筆，共 {{ users.length }} 筆
            </div>
            <div class="flex items-center gap-2">
                <button 
                 @click="currentUserPage--" 
                 :disabled="currentUserPage === 1"
-                class="px-3 py-1 text-sm font-medium border border-zinc-200 rounded-md bg-white hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-700"
+                class="px-3 py-1 text-sm font-medium border border-border rounded-md bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground"
                >
                  上一頁
                </button>
-               <span class="text-sm font-medium text-zinc-900">第 {{ currentUserPage }} 頁</span>
+               <span class="text-sm font-medium text-foreground">第 {{ currentUserPage }} 頁</span>
                <button 
                 @click="currentUserPage++" 
                 :disabled="currentUserPage >= totalUserPages"
-                class="px-3 py-1 text-sm font-medium border border-zinc-200 rounded-md bg-white hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-700"
+                class="px-3 py-1 text-sm font-medium border border-border rounded-md bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground"
                >
                  下一頁
                </button>
@@ -821,41 +917,41 @@ function exportHistoryExcel() {
     </div>
 
     <!-- Loading -->
-    <div v-if="loading && !['INVENTORY', 'USERS', 'CONSUMABLES'].includes(activeTab)" class="text-center py-12 text-zinc-500">載入中...</div>
+    <div v-if="loading && !['INVENTORY', 'USERS', 'CONSUMABLES'].includes(activeTab)" class="text-center py-12 text-muted-foreground">載入中...</div>
 
     <!-- Order List (Only show when NOT in Inventory or Users tab) -->
     <div v-if="!['OVERVIEW', 'INVENTORY', 'USERS', 'CONSUMABLES'].includes(activeTab) && !loading" class="space-y-4">
       
        <!-- History Actions (Only for History Tab) -->
        <div v-if="activeTab === 'HISTORY'" class="flex justify-end mb-2">
-          <button @click="exportHistoryExcel" class="flex items-center justify-center gap-2 bg-white text-zinc-900 border border-zinc-200 px-4 py-2 rounded-md shadow-sm hover:bg-zinc-50 transition text-sm font-medium">
+          <button @click="exportHistoryExcel" class="flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 px-4 py-2 rounded-md shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 transition text-sm font-medium">
              <ArrowDownTrayIcon class="w-4 h-4" /> 匯出 Excel
           </button>
        </div>
       
        <!-- Empty State -->
-       <div v-if="orders.filter(o => activeTab === 'HISTORY' ? ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status) : o.status === activeTab).length === 0" class="text-center py-12 bg-zinc-50 rounded-lg border border-dashed border-zinc-300">
-         <p class="text-zinc-500">目前沒有資料</p>
+       <div v-if="orders.filter(o => activeTab === 'HISTORY' ? ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status) : o.status === activeTab).length === 0" class="text-center py-12 bg-muted/20 rounded-lg border border-dashed border-border">
+         <p class="text-muted-foreground">目前沒有資料</p>
        </div>
 
       <div 
         v-for="order in orders.filter(o => activeTab === 'HISTORY' ? ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status) : o.status === activeTab)" 
         :key="order.id"
-        class="bg-white rounded-lg border border-zinc-200 p-6 transition hover:border-zinc-300"
+        class="bg-card rounded-lg border border-border p-6 transition hover:border-input"
       >
         <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
           
           <!-- Info -->
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-2">
-              <span class="font-bold text-lg text-zinc-900">{{ order.applicant_name }}</span>
+              <span class="font-bold text-lg text-foreground">{{ order.applicant_name }}</span>
               
               <span class="px-2 py-0.5 rounded-md text-xs font-bold border ml-2" 
                 :class="{
-                  'bg-white border-zinc-300 text-zinc-700': order.status === 'PENDING',
-                  'bg-zinc-900 text-white border-zinc-900': order.status === 'APPROVED' || order.status === 'COMPLETED',
-                  'bg-zinc-100 text-zinc-400 border-zinc-200 line-through': order.status === 'REJECTED' || order.status === 'CANCELLED',
-                  'bg-white text-zinc-500 border-zinc-200': order.status === 'RETURNED'
+                  'bg-background border-border text-foreground': order.status === 'PENDING',
+                  'bg-primary text-primary-foreground border-primary': order.status === 'APPROVED' || order.status === 'COMPLETED',
+                  'bg-muted/50 text-muted-foreground border-border line-through': order.status === 'REJECTED' || order.status === 'CANCELLED',
+                  'bg-background text-muted-foreground border-border': order.status === 'RETURNED'
                 }">
                 <span v-if="order.status === 'APPROVED' || order.status === 'COMPLETED'" class="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-1 mb-0.5"></span>
                  {{ 
@@ -868,20 +964,20 @@ function exportHistoryExcel() {
               </span>
             </div>
             
-            <div class="text-sm text-zinc-600 mb-2">
-              <span class="font-medium text-zinc-900">用途:</span> {{ order.purpose }}
+            <div class="text-sm text-muted-foreground mb-2">
+              <span class="font-medium text-foreground">用途:</span> {{ order.purpose }}
             </div>
             
-            <div class="text-sm text-zinc-500 flex items-center gap-2 flex-wrap">
-              <span class="bg-zinc-50 px-2 py-1 rounded border border-zinc-100">📅 {{ order.start_date }} ~ {{ order.end_date }}</span>
+            <div class="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+              <span class="bg-muted px-2 py-1 rounded border border-border">📅 {{ order.start_date }} ~ {{ order.end_date }}</span>
             </div>
 
             <!-- Items -->
-            <div class="mt-4 border-t border-zinc-100 pt-3">
+            <div class="mt-4 border-t border-border pt-3">
               <ul class="space-y-1">
-                <li v-for="item in order.order_items" :key="item.id" class="text-sm flex justify-between text-zinc-700">
+                <li v-for="item in order.order_items" :key="item.id" class="text-sm flex justify-between text-muted-foreground">
                   <span>{{ item.item_name_snapshot }}</span>
-                  <span class="font-mono font-medium text-zinc-900">x{{ item.quantity }}</span>
+                  <span class="font-mono font-medium text-foreground">x{{ item.quantity }}</span>
                 </li>
               </ul>
             </div>
@@ -891,24 +987,24 @@ function exportHistoryExcel() {
           <div class="flex flex-col gap-2 min-w-[120px]">
             <!-- Pending Actions -->
             <template v-if="order.status === 'PENDING'">
-              <button @click="updateStatus(order.id, 'APPROVED')" class="flex items-center justify-center gap-2 bg-zinc-900 text-white px-3 py-2 rounded-md hover:bg-zinc-800 transition text-sm font-medium">
+              <button @click="updateStatus(order.id, 'APPROVED')" class="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-md hover:bg-primary/90 transition text-sm font-medium">
                 <CheckIcon class="w-3 h-3" /> 同意
               </button>
-              <button @click="updateStatus(order.id, 'REJECTED')" class="flex items-center justify-center gap-2 bg-white border border-zinc-200 text-zinc-600 px-3 py-2 rounded-md hover:bg-zinc-50 hover:text-red-600 transition text-sm font-medium">
+              <button @click="updateStatus(order.id, 'REJECTED')" class="flex items-center justify-center gap-2 bg-background border border-border text-muted-foreground px-3 py-2 rounded-md hover:bg-muted hover:text-destructive transition text-sm font-medium">
                 <XMarkIcon class="w-3 h-3" /> 拒絕
               </button>
             </template>
 
             <!-- Approved Actions -->
             <template v-if="order.status === 'APPROVED'">
-              <button @click="updateStatus(order.id, 'RETURNED')" class="flex items-center justify-center gap-2 bg-white border border-zinc-900 text-zinc-900 px-3 py-2 rounded-md hover:bg-zinc-50 transition text-sm font-medium">
+              <button @click="updateStatus(order.id, 'RETURNED')" class="flex items-center justify-center gap-2 bg-background border border-primary text-primary px-3 py-2 rounded-md hover:bg-secondary transition text-sm font-medium">
                 <ArchiveBoxArrowDownIcon class="w-3 h-3" /> 歸還
               </button>
             </template>
 
             <!-- History Actions -->
              <template v-if="['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(order.status)">
-              <button @click="deleteOrder(order.id)" class="flex items-center justify-center gap-1 bg-white border border-zinc-200 text-zinc-400 px-3 py-2 rounded-md hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition text-xs font-medium">
+              <button @click="deleteOrder(order.id)" class="flex items-center justify-center gap-1 bg-background border border-border text-muted-foreground px-3 py-2 rounded-md hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition text-xs font-medium">
                 <Trash class="w-3 h-3" /> 刪除紀錄
               </button>
             </template>

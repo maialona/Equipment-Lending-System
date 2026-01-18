@@ -45,8 +45,8 @@ onMounted(() => {
   <div>
     <!-- Hero / Header -->
     <div class="mb-8 text-center sm:text-left">
-      <h1 class="text-3xl font-bold text-zinc-900 mb-2">耗材領用</h1>
-      <p class="text-zinc-500">請選擇您需要的耗材並加入清單。</p>
+      <h1 class="text-3xl font-bold text-foreground mb-2">耗材領用</h1>
+      <p class="text-muted-foreground">請選擇您需要的耗材並加入清單。</p>
     </div>
 
     <!-- Category Filter -->
@@ -57,8 +57,8 @@ onMounted(() => {
         @click="selectedCategory = cat"
         class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors border"
         :class="selectedCategory === cat 
-          ? 'bg-zinc-900 text-white border-zinc-900' 
-          : 'bg-white text-zinc-600 border-zinc-100 hover:bg-zinc-50 hover:text-zinc-900'"
+          ? 'bg-primary text-primary-foreground border-primary' 
+          : 'bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground'"
       >
         {{ cat }}
       </button>
@@ -66,11 +66,11 @@ onMounted(() => {
 
     <!-- Loading State (Skeleton) -->
     <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-for="n in 6" :key="n" class="bg-white rounded-lg border border-zinc-100 p-5 flex flex-col justify-between h-[180px]">
+      <div v-for="n in 6" :key="n" class="bg-card rounded-lg border border-border p-5 flex flex-col justify-between h-[180px]">
         <div>
           <div class="flex justify-between items-start mb-3">
-             <Skeleton class="h-5 w-16 bg-zinc-100" />
-             <Skeleton class="h-5 w-12 bg-zinc-50" />
+             <Skeleton class="h-5 w-16 bg-muted" />
+             <Skeleton class="h-5 w-12 bg-muted" />
           </div>
           <Skeleton class="h-6 w-3/4 mb-2" />
           <Skeleton class="h-4 w-1/2" />
@@ -80,24 +80,24 @@ onMounted(() => {
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="items.length === 0" class="text-center py-12 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">
-        <p class="text-zinc-500">目前沒有可用的耗材。</p>
+    <div v-else-if="items.length === 0" class="text-center py-12 bg-card rounded-lg border border-dashed border-border">
+        <p class="text-muted-foreground">目前沒有可用的耗材。</p>
     </div>
 
     <!-- Grid -->
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-for="item in filteredItems" :key="item.id" class="group bg-white rounded-lg border border-zinc-200 p-5 flex flex-col justify-between hover:border-zinc-300 transition-colors">
+      <div v-for="item in filteredItems" :key="item.id" class="group bg-card rounded-lg border border-border p-5 flex flex-col justify-between hover:border-input transition-colors">
         
         <!-- Header -->
         <div>
           <div class="flex justify-between items-start mb-3">
              <!-- Category Tag Removed -->
-             <div class="text-[10px] font-medium text-zinc-500 border border-zinc-200 px-2 py-0.5 rounded bg-zinc-50 ml-auto">
+             <div class="text-[10px] font-medium text-muted-foreground border border-border px-2 py-0.5 rounded bg-muted ml-auto">
                 庫存: {{ item.total_stock }}
              </div>
           </div>
-          <h3 class="text-lg font-bold text-zinc-900 mb-1 leading-tight">{{ item.name }}</h3>
-          <p class="text-xs text-zinc-500 font-mono" v-if="item.custom_id">{{ item.custom_id }}</p>
+          <h3 class="text-lg font-bold text-foreground mb-1 leading-tight">{{ item.name }}</h3>
+          <p class="text-xs text-muted-foreground font-mono" v-if="item.custom_id">{{ item.custom_id }}</p>
         </div>
 
         <!-- Action -->

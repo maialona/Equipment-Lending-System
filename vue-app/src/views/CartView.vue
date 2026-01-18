@@ -301,24 +301,24 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
   <div class="max-w-6xl mx-auto"> <!-- Increased from max-w-3xl to max-w-6xl -->
     
     <!-- Empty Cart -->
-    <div v-if="cart.items.length === 0 && !success" class="text-center py-16 bg-white rounded-lg border border-zinc-200 border-dashed">
-      <div class="text-zinc-300 mb-4">
+    <div v-if="cart.items.length === 0 && !success" class="text-center py-16 bg-card rounded-lg border border-dashed border-border">
+      <div class="text-muted-foreground/50 mb-4">
         <!-- Clipboard Icon -->
         <ClipboardDocumentListIcon class="w-16 h-16 mx-auto" />
       </div>
-      <h2 class="text-xl font-bold text-zinc-900 mb-2">借用清單是空的</h2>
-      <p class="text-zinc-500 mb-6 font-medium">還沒加入任何項目喔！</p>
-      <button @click="router.push('/')" class="bg-zinc-900 text-white px-6 py-2.5 rounded-md hover:bg-zinc-800 transition text-sm font-medium">去逛逛器材</button>
+      <h2 class="text-xl font-bold text-foreground mb-2">借用清單是空的</h2>
+      <p class="text-muted-foreground mb-6 font-medium">還沒加入任何項目喔！</p>
+      <button @click="router.push('/')" class="bg-primary text-primary-foreground px-6 py-2.5 rounded-md hover:bg-primary/90 transition text-sm font-medium">去逛逛器材</button>
     </div>
 
     <!-- Success Message -->
-    <div v-else-if="success" class="bg-white p-12 rounded-lg border border-zinc-200 text-center shadow-sm">
-      <div class="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-zinc-100">
-         <CheckCircleIcon class="w-8 h-8 text-zinc-900" />
+    <div v-else-if="success" class="bg-card p-12 rounded-lg border border-border text-center shadow-sm">
+      <div class="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6 border border-border">
+         <CheckCircleIcon class="w-8 h-8 text-foreground" />
       </div>
-      <h2 class="text-2xl font-bold text-zinc-900 mb-2">{{ isOnlyConsumables ? '領用成功！' : '預約申請已送出！' }}</h2>
-      <p class="text-zinc-500 mb-8">{{ isOnlyConsumables ? '請至相關櫃位領取耗材。' : '管理員將會審核您的申請。' }}</p>
-      <button @click="router.push('/equipment')" class="bg-zinc-900 text-white px-6 py-2.5 rounded-md hover:bg-zinc-800 transition text-sm font-bold">返回首頁</button>
+      <h2 class="text-2xl font-bold text-foreground mb-2">{{ isOnlyConsumables ? '領用成功！' : '預約申請已送出！' }}</h2>
+      <p class="text-muted-foreground mb-8">{{ isOnlyConsumables ? '請至相關櫃位領取耗材。' : '管理員將會審核您的申請。' }}</p>
+      <button @click="router.push('/equipment')" class="bg-primary text-primary-foreground px-6 py-2.5 rounded-md hover:bg-primary/90 transition text-sm font-bold">返回首頁</button>
     </div>
 
     <!-- Checkout Form -->
@@ -326,34 +326,34 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
       
       <!-- Cart Items List (Left) -->
       <div class="lg:col-span-3 space-y-4">
-        <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-3">
+        <h2 class="text-lg font-bold text-foreground flex items-center gap-3">
           借用內容 
-          <span class="bg-zinc-100 text-zinc-600 text-xs font-bold px-2 py-0.5 rounded-full border border-zinc-200">{{ cart.totalItems }}</span>
+          <span class="bg-muted text-muted-foreground text-xs font-bold px-2 py-0.5 rounded-full border border-border">{{ cart.totalItems }}</span>
         </h2>
         
-       <div class="bg-white rounded-lg border border-zinc-200 overflow-hidden divide-y divide-zinc-100">
+       <div class="bg-card rounded-lg border border-border overflow-hidden divide-y divide-border">
           <div v-for="item in cart.items" :key="item.id" class="p-5 flex items-center gap-4">
              <!-- Info -->
              <div class="flex-1 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                <div class="flex items-center gap-2 mr-auto">
-                 <h3 class="font-bold text-zinc-900 text-base">{{ item.name }}</h3>
-                 <span class="text-[10px] text-zinc-500 font-medium bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200 shrink-0">{{ item.category }}</span>
+                 <h3 class="font-bold text-foreground text-base">{{ item.name }}</h3>
+                 <span class="text-[10px] text-muted-foreground font-medium bg-muted px-1.5 py-0.5 rounded border border-border shrink-0">{{ item.category }}</span>
                </div>
                
                <!-- Quantity Control -->
-               <div class="flex items-center w-fit border border-zinc-200 rounded-md bg-white shrink-0">
+               <div class="flex items-center w-fit border border-border rounded-md bg-background shrink-0">
                   <button 
                       @click="cart.updateQuantity(item.id, item.quantity - 1)"
                       :disabled="item.quantity <= 1"
-                      class="p-1 px-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      class="p-1 px-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                   >
                       <MinusIcon class="w-3 h-3" />
                   </button>
-                  <span class="text-xs font-bold font-mono px-1 w-6 text-center text-zinc-900">{{ item.quantity }}</span>
+                  <span class="text-xs font-bold font-mono px-1 w-6 text-center text-foreground">{{ item.quantity }}</span>
                   <button 
                       @click="cart.updateQuantity(item.id, item.quantity + 1)"
                       :disabled="item.quantity >= item.total_stock"
-                      class="p-1 px-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      class="p-1 px-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                   >
                       <PlusIcon class="w-3 h-3" />
                   </button>
@@ -361,7 +361,7 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
              </div>
 
              <!-- Remove -->
-             <button @click="cart.removeItem(item.id)" class="text-zinc-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors flex items-center justify-center w-8 h-8 shrink-0">
+             <button @click="cart.removeItem(item.id)" class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-2 rounded-full transition-colors flex items-center justify-center w-8 h-8 shrink-0">
                <TrashIcon class="w-4 h-4" />
              </button>
           </div>
@@ -370,36 +370,36 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
 
       <!-- Applicant Form (Right) -->
       <div class="lg:col-span-2">
-        <div class="bg-white p-6 rounded-lg border border-zinc-200 sticky top-24 shadow-sm space-y-6">
+        <div class="bg-card p-6 rounded-lg border border-border sticky top-24 shadow-sm space-y-6">
           
           <!-- Common Info -->
           <div>
-            <h2 class="text-base font-bold text-zinc-900 mb-4 pb-2 border-b border-zinc-100">基本資料</h2>
+            <h2 class="text-base font-bold text-foreground mb-4 pb-2 border-b border-border">基本資料</h2>
             <div class="space-y-4">
                <div>
-                  <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">姓名 *</label>
-                  <input v-model="commonForm.applicant_name" type="text" class="w-full border-zinc-200 rounded-md shadow-sm focus:border-zinc-900 focus:ring-zinc-900 p-2.5 border text-sm transition-colors" placeholder="請輸入全名">
+                  <label class="block text-xs font-bold text-muted-foreground mb-1.5 uppercase tracking-wider">姓名 *</label>
+                  <input v-model="commonForm.applicant_name" type="text" class="w-full border-input bg-background rounded-md shadow-sm focus:border-ring focus:ring-ring p-2.5 border text-sm transition-colors text-foreground" placeholder="請輸入全名">
                </div>
 
                <div>
-                  <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">用途 *</label>
-                  <textarea v-model="commonForm.purpose" rows="2" class="w-full border-zinc-200 rounded-md shadow-sm focus:border-zinc-900 focus:ring-zinc-900 p-2.5 border text-sm transition-colors" placeholder="請簡述使用目的"></textarea>
+                  <label class="block text-xs font-bold text-muted-foreground mb-1.5 uppercase tracking-wider">用途 *</label>
+                  <textarea v-model="commonForm.purpose" rows="2" class="w-full border-input bg-background rounded-md shadow-sm focus:border-ring focus:ring-ring p-2.5 border text-sm transition-colors text-foreground" placeholder="請簡述使用目的"></textarea>
                </div>
             </div>
           </div>
 
           <!-- Space Section -->
-          <div v-if="hasSpace" class="bg-white p-5 rounded-lg border border-zinc-200">
-             <h3 class="text-sm font-bold text-zinc-900 mb-4 flex items-center gap-2">
+          <div v-if="hasSpace" class="bg-card p-5 rounded-lg border border-border">
+             <h3 class="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
                 <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                 空間預約資訊
              </h3>
              <div class="space-y-4">
                 <div>
-                   <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase">預約日期 *</label>
+                   <label class="block text-xs font-bold text-muted-foreground mb-1.5 uppercase">預約日期 *</label>
                    <Popover>
                       <PopoverTrigger as-child>
-                        <Button variant="outline" :class="cn('w-full justify-start text-left font-normal bg-white border-zinc-200 hover:bg-zinc-50', !spaceDateValue && 'text-muted-foreground')">
+                        <Button variant="outline" :class="cn('w-full justify-start text-left font-normal bg-background border-input hover:bg-muted text-foreground', !spaceDateValue && 'text-muted-foreground')">
                           <CalendarIcon class="mr-2 h-4 w-4" />
                           {{ spaceDateValue ? spaceDateValue.toString() : "選擇日期" }}
                         </Button>
@@ -411,18 +411,18 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                    <div>
-                      <label class="block text-[10px] font-bold text-zinc-500 mb-1 uppercase">開始時間</label>
+                      <label class="block text-[10px] font-bold text-muted-foreground mb-1 uppercase">開始時間</label>
                       <Select v-model="spaceForm.start_time">
-                        <SelectTrigger class="bg-white border-zinc-200 hover:bg-zinc-50"><SelectValue placeholder="選擇" /></SelectTrigger>
+                        <SelectTrigger class="bg-background border-input hover:bg-muted text-foreground"><SelectValue placeholder="選擇" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem v-for="t in timeOptions" :key="t" :value="t">{{ t }}</SelectItem>
                         </SelectContent>
                       </Select>
                    </div>
                    <div>
-                      <label class="block text-[10px] font-bold text-zinc-500 mb-1 uppercase">結束時間</label>
+                      <label class="block text-[10px] font-bold text-muted-foreground mb-1 uppercase">結束時間</label>
                       <Select v-model="spaceForm.end_time">
-                        <SelectTrigger class="bg-white border-zinc-200 hover:bg-zinc-50"><SelectValue placeholder="選擇" /></SelectTrigger>
+                        <SelectTrigger class="bg-background border-input hover:bg-muted text-foreground"><SelectValue placeholder="選擇" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem v-for="t in timeOptions" :key="t" :value="t">{{ t }}</SelectItem>
                         </SelectContent>
@@ -433,17 +433,17 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
           </div>
 
           <!-- Equipment Section -->
-          <div v-if="hasEquip" class="bg-white p-5 rounded-lg border border-zinc-200">
-             <h3 class="text-sm font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-zinc-900"></span>
+          <div v-if="hasEquip" class="bg-card p-5 rounded-lg border border-border">
+             <h3 class="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
                 器材借用資訊
              </h3>
              <div class="grid grid-cols-2 gap-3">
                <div>
-                 <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase">借用日期 *</label>
+                 <label class="block text-xs font-bold text-muted-foreground mb-1.5 uppercase">借用日期 *</label>
                  <Popover>
                    <PopoverTrigger as-child>
-                     <Button variant="outline" :class="cn('w-full justify-start text-left font-normal bg-white border-zinc-200 hover:bg-zinc-50', !equipStartDateValue && 'text-muted-foreground')">
+                     <Button variant="outline" :class="cn('w-full justify-start text-left font-normal bg-background border-input hover:bg-muted text-foreground', !equipStartDateValue && 'text-muted-foreground')">
                        <CalendarIcon class="mr-2 h-4 w-4" />
                        {{ equipStartDateValue ? equipStartDateValue.toString() : "選擇日期" }}
                      </Button>
@@ -454,10 +454,10 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
                  </Popover>
                </div>
                <div>
-                 <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase">歸還日期 *</label>
+                 <label class="block text-xs font-bold text-muted-foreground mb-1.5 uppercase">歸還日期 *</label>
                  <Popover>
                    <PopoverTrigger as-child>
-                     <Button variant="outline" :class="cn('w-full justify-start text-left font-normal bg-white border-zinc-200 hover:bg-zinc-50', !equipEndDateValue && 'text-muted-foreground')">
+                     <Button variant="outline" :class="cn('w-full justify-start text-left font-normal bg-background border-input hover:bg-muted text-foreground', !equipEndDateValue && 'text-muted-foreground')">
                        <CalendarIcon class="mr-2 h-4 w-4" />
                        {{ equipEndDateValue ? equipEndDateValue.toString() : "選擇日期" }}
                      </Button>
@@ -471,22 +471,22 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
           </div>
 
           <!-- Consumables Notice -->
-          <div v-if="hasConsumable" class="bg-white p-4 rounded-r-lg border-l-4 border-orange-500 shadow-sm flex gap-3 items-start">
-             <div class="bg-orange-50 p-1.5 rounded-full shrink-0">
-                <CheckCircleIcon class="w-4 h-4 text-orange-600" />
+          <div v-if="hasConsumable" class="bg-card p-4 rounded-r-lg border-l-4 border-orange-500 shadow-sm flex gap-3 items-start">
+             <div class="bg-orange-50 dark:bg-orange-900/20 p-1.5 rounded-full shrink-0">
+                <CheckCircleIcon class="w-4 h-4 text-orange-600 dark:text-orange-400" />
              </div>
-             <div class="text-sm text-zinc-600">
-                <span class="font-bold text-zinc-900 block mb-0.5">包含耗材項目</span>
+             <div class="text-sm text-muted-foreground">
+                <span class="font-bold text-foreground block mb-0.5">包含耗材項目</span>
                 耗材將於送出申請後直接視為「已領取」。
              </div>
           </div>
 
              <!-- Submission -->
-          <div class="pt-4 border-t border-zinc-100">
+          <div class="pt-4 border-t border-border">
              <button 
                @click="submitOrder" 
                :disabled="loading"
-               class="w-full bg-zinc-900 text-white py-3 rounded-md font-bold hover:bg-zinc-800 disabled:opacity-50 transition-all text-sm shadow-sm"
+               class="w-full bg-primary text-primary-foreground py-3 rounded-md font-bold hover:bg-primary/90 disabled:opacity-50 transition-all text-sm shadow-sm"
              >
                {{ loading ? '處理中...' : '確認送出申請' }}
              </button>

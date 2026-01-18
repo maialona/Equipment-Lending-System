@@ -1,13 +1,22 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { startOfMonth, subDays, format, isSameDay, isAfter, isBefore, addDays } from 'date-fns'
-import { ArrowRightIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon, XIcon } from 'lucide-vue-next'
-import { useTransition, TransitionPresets } from '@vueuse/core'
+import { startOfMonth, isSameMonth, subDays, format, isSameDay, isAfter, isBefore, addDays } from 'date-fns'
+import { ArrowRightIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon, XIcon, TrendingUp, PieChart as PieChartIcon } from 'lucide-vue-next'
+import { useTransition, TransitionPresets, useIntersectionObserver } from '@vueuse/core'
+import { Doughnut, Line, Bar } from 'vue-chartjs'
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, Title, BarElement, Filler } from 'chart.js'
+
+import { useDark } from '@vueuse/core'
+
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, Title, BarElement, Filler)
+
+const isDark = useDark()
 
 const isMounted = ref(false)
 const showLowStockModal = ref(false)
 const showPendingModal = ref(false)
 const showActiveLoansModal = ref(false)
+const trendPeriod = ref('7d')
 
 onMounted(() => {
     // Small delay to ensure transition triggers after render
@@ -53,12 +62,14 @@ const lowStockItems = computed(() => props.inventory.filter(i =>
 const lowStockCountSource = computed(() => isMounted.value ? lowStockItems.value.length : 0)
 const lowStockCount = useTransition(lowStockCountSource, { duration: 1500, delay: 200, transition: TransitionPresets.easeOutExpo })
 
-const monthlyUsageSource = computed(() => {
-    if (!isMounted.value) return 0
-    const start = startOfMonth(new Date())
-    return props.orders.filter(o => new Date(o.created_at) >= start).length
+const monthlyUsage = computed(() => {
+    // Determine month based on period, defaulting to current
+    const now = new Date();
+    return props.orders.filter(o => isSameMonth(new Date(o.created_at), now)).length
 })
-const monthlyUsage = useTransition(monthlyUsageSource, { duration: 1500, delay: 300, transition: TransitionPresets.easeOutExpo })
+
+// Interaction State for Center Text
+const hoveredInventoryItem = ref(null) // { label, value } or null
 
 // --- Layer 2: The Trends (Chart & Ranking) ---
 
@@ -90,6 +101,8 @@ const topItems = computed(() => {
     
     return Object.entries(itemCounts)
         .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
 })
@@ -157,123 +170,417 @@ const feedItems = computed(() => {
     }).slice(0, 10) // Limit to 10
 })
 
+
+
+// --- Charts Data ---
+
+const inventoryDistribution = computed(() => {
+    const counts = {}
+    props.inventory.forEach(item => {
+        const cat = item.category || '未分類'
+        counts[cat] = (counts[cat] || 0) + item.total_stock
+    })
+    
+    // Sort and Top 5 + Others
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
+    const labels = []
+    const data = []
+    
+    // Limit to 5 for better legibility (User requested Top 5)
+    const limit = 5;
+    
+    sorted.slice(0, limit).forEach(([cat, count]) => {
+        labels.push(cat)
+        data.push(count)
+    })
+    
+    if (sorted.length > limit) {
+        labels.push('其他')
+        data.push(sorted.slice(limit).reduce((acc, curr) => acc + curr[1], 0))
+    }
+
+    // Calculate actual total stock
+    const totalInventoryStock = props.inventory.reduce((acc, curr) => acc + curr.total_stock, 0)
+
+    return {
+        labels,
+        totalStock: totalInventoryStock, 
+        datasets: [{
+            backgroundColor: isDark.value 
+                ? ['#ffffff', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a'] 
+                : ['#000000', '#52525b', '#71717a', '#a1a1aa', '#d4d4d8', '#e4e4e7'], 
+            data,
+            borderColor: isDark.value ? '#18181b' : '#ffffff', // Explicitly use Card BG Hex
+            borderWidth: 3,
+            hoverOffset: 4
+        }]
+    }
+})
+
+const borrowingTrend = computed(() => {
+    const days = []
+    const data = []
+    
+    for (let i = 13; i >= 0; i--) { // Last 14 days
+        const d = subDays(new Date(), i)
+        days.push(format(d, 'MM/dd'))
+        const count = props.orders.filter(o => isSameDay(new Date(o.created_at), d)).length
+        data.push(count)
+    }
+
+    return {
+        labels: days,
+        datasets: [{
+            label: '申請數',
+            backgroundColor: (ctx) => {
+                const canvas = ctx.chart.ctx;
+                const gradient = canvas.createLinearGradient(0, 0, 0, 300);
+                
+                // Use explicit line colors for gradient base
+                const color = isDark.value ? '255, 255, 255' : '0, 0, 0'; 
+                
+                gradient.addColorStop(0, `rgba(${color}, 0.2)`); // Top 20% opacity
+                gradient.addColorStop(1, `rgba(${color}, 0)`);   // Bottom transparent
+                return gradient;
+            },
+            borderColor: isDark.value ? '#ffffff' : '#000000', // White in Dark, Black in Light
+            data,
+            tension: 0.4,
+            pointRadius: 0, // Minimize points
+            pointHoverRadius: 4,
+            pointBackgroundColor: isDark.value ? '#ffffff' : '#000000',
+            pointBorderColor: isDark.value ? '#ffffff' : '#000000',
+            pointBorderWidth: 2,
+            fill: true
+        }]
+    }
+})
+
+
+
+const popularItemsChart = computed(() => {
+    const sorted = topItems.value
+    
+    return {
+        labels: sorted.map(i => i.name),
+        datasets: [{
+            label: '借用次數',
+            backgroundColor: 'hsl(var(--primary))',
+            data: sorted.map(i => i.count),
+            borderRadius: 4,
+            barThickness: 40,
+            maxBarThickness: 50
+        }]
+    }
+})
+
+const chartOptions = computed(() => {
+    const textColor = isDark.value ? '#ffffff' : 'hsl(var(--muted-foreground))' // White text in dark mode
+    const gridColor = 'hsl(var(--border))' // lighter grid
+    
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { 
+                display: false 
+            },
+            tooltip: {
+                backgroundColor: 'hsl(var(--popover))',
+                titleColor: 'hsl(var(--popover-foreground))',
+                bodyColor: 'hsl(var(--popover-foreground))',
+                borderColor: 'hsl(var(--border))',
+                borderWidth: 1,
+                padding: 10,
+                displayColors: false
+            }
+        },
+        scales: {
+            x: { 
+                grid: { display: false },
+                ticks: { color: textColor, font: { size: 11 } }
+            },
+            y: { 
+                beginAtZero: true,
+                grid: { 
+                    color: isDark.value ? '#27272a' : '#e4e4e7', // zinc-800 : zinc-200
+                    borderDash: [4, 4], // Dashed grid lines
+                    drawBorder: false // Remove axis line
+                },
+                ticks: { stepSize: 1, color: textColor, font: { size: 11 } }
+            }
+        },
+        elements: {
+            line: {
+                fill: true, // Gradient fill
+            }
+        }
+    }
+})
+
+const doughnutOptions = computed(() => { 
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '75%', // Thinner donut
+        layout: {
+            padding: 20 // Prevent hover truncation
+        },
+        onHover: (event, elements) => {
+             if (elements && elements.length > 0) {
+                 const index = elements[0].index;
+                 const dataset = inventoryDistribution.value.datasets[0];
+                 const value = dataset.data[index]
+                 const label = inventoryDistribution.value.labels[index]
+                 const total = inventoryDistribution.value.totalStock || 1
+                 const percent = Math.round((value / total) * 100) + '%'
+                 hoveredInventoryItem.value = { value, label, percent }
+             } else {
+                 hoveredInventoryItem.value = null
+             }
+        },
+        plugins: {
+            legend: { 
+                display: false 
+            },
+            tooltip: {
+                enabled: false // Disable tooltip completely as requested
+            }
+        }
+    }
+})
+
+// Intersection Observer for Feed Animation
+const feedSection = ref(null)
+const isFeedVisible = ref(false)
+
+useIntersectionObserver(
+  feedSection,
+  ([{ isIntersecting }]) => {
+    if (isIntersecting) {
+        isFeedVisible.value = true
+    }
+  },
+  { threshold: 0.1 } // Trigger when 10% visible
+)
+
+// Intersection Observer for Layer 2 (Popular Items & Low Stock)
+const layer2Section = ref(null)
+const isLayer2Visible = ref(false)
+
+useIntersectionObserver(
+  layer2Section,
+  ([{ isIntersecting }]) => {
+    if (isIntersecting) {
+        isLayer2Visible.value = true
+    }
+  },
+  { threshold: 0.1 }
+)
+
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
       
-      <!-- Layer 1: The Pulse -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-both" style="animation-fill-mode: both;">
-          <!-- Pending -->
-           <div @click="showPendingModal = true" class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 transition-colors">
+       <!-- Layer 1: The Pulse -->
+       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-both" style="animation-fill-mode: both;">
+           <!-- Pending -->
+            <div @click="showPendingModal = true" class="bg-card border border-border rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors shadow-sm">
                <div class="flex justify-between items-start">
-                   <span class="text-sm font-medium text-zinc-500">待審核申請</span>
-                   <div v-if="pendingCount > 0" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                   <span class="text-sm font-medium text-muted-foreground">待審核申請</span>
+                   <AlertCircleIcon class="w-4 h-4 text-muted-foreground" />
                </div>
-               <div class="text-3xl font-bold text-zinc-900 tracking-tight">
+               <div class="text-4xl font-bold text-foreground tracking-tight mt-2">
                    {{ Math.round(pendingCount) }}
-               </div>
-               <div class="absolute bottom-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                   <AlertCircleIcon class="w-12 h-12 text-zinc-900" />
                </div>
            </div>
 
            <!-- Active Loans -->
-           <div @click="showActiveLoansModal = true" class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 transition-colors">
+           <div @click="showActiveLoansModal = true" class="bg-card border border-border rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors shadow-sm">
                <div class="flex justify-between items-start">
-                   <span class="text-sm font-medium text-zinc-500">出借中器材</span>
+                   <span class="text-sm font-medium text-muted-foreground">出借中器材</span>
+                   <ClockIcon class="w-4 h-4 text-muted-foreground" />
                </div>
-               <div class="text-3xl font-bold text-zinc-900 tracking-tight">
+               <div class="text-4xl font-bold text-foreground tracking-tight mt-2">
                    {{ Math.round(activeLoansCount) }}
-               </div>
-               <div class="absolute bottom-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                   <ClockIcon class="w-12 h-12 text-zinc-900" />
                </div>
            </div>
 
            <!-- Low Stock -->
-           <div @click="showLowStockModal = true" class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 transition-colors">
+           <div @click="showLowStockModal = true" class="bg-card border border-border rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors shadow-sm">
                <div class="flex justify-between items-start">
-                   <span class="text-sm font-medium text-zinc-500">庫存緊張</span>
-                   <div v-if="lowStockCount > 0" class="flex items-center justify-center bg-zinc-100 rounded text-[10px] font-bold px-1.5 py-0.5 text-zinc-600 border border-zinc-200">
-                        &le; 3 items
+                   <span class="text-sm font-medium text-muted-foreground">庫存緊張</span>
+                   <div v-if="lowStockCount > 0" class="flex items-center justify-center bg-red-50 dark:bg-red-500/15 rounded text-[10px] font-bold px-1.5 py-0.5 text-red-700 dark:text-red-400">
+                        Alert
                    </div>
                </div>
-               <div class="text-3xl font-bold text-zinc-900 tracking-tight">
+               <div class="text-4xl font-bold text-foreground tracking-tight mt-2">
                    {{ Math.round(lowStockCount) }}
-               </div>
-                <!-- Visual usage bar example -->
-               <div class="w-full bg-zinc-100 h-1 rounded-full overflow-hidden mt-1">
-                   <div class="bg-zinc-900 h-full rounded-full transition-all duration-1000 ease-out" 
-                        :style="{ width: isMounted ? (lowStockCountSource / (inventory.length || 1)) * 100 + '%' : '0%' }"></div>
                </div>
            </div>
 
            <!-- Monthly Usage -->
-           <div class="bg-white border border-zinc-200 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
+           <div class="bg-card border border-border rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group shadow-sm">
                <div class="flex justify-between items-start">
-                   <span class="text-sm font-medium text-zinc-500">本月總借用次數</span>
+                   <span class="text-sm font-medium text-muted-foreground">本月總借用次數</span>
+                   <CheckCircleIcon class="w-4 h-4 text-muted-foreground" />
                </div>
-               <div class="text-3xl font-bold text-zinc-900 tracking-tight">
+               <div class="text-4xl font-bold text-foreground tracking-tight mt-2">
                    {{ Math.round(monthlyUsage) }}
-               </div>
-               <div class="absolute bottom-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                   <CheckCircleIcon class="w-12 h-12 text-zinc-900" />
                </div>
            </div>
       </div>
 
       <!-- Layer 2: The Trends -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 fill-mode-both" style="animation-fill-mode: both;">
-          
-          <!-- Chart -->
-          <div class="col-span-1 lg:col-span-2 bg-white border border-zinc-200 rounded-xl p-6 h-80 flex flex-col">
-              <div class="mb-6">
-                  <h3 class="text-sm font-medium text-zinc-500">借用趨勢 (近7日)</h3>
-              </div>
-              <div class="flex-1 w-full flex items-end gap-2 sm:gap-4">
-                  <div v-for="(day, index) in chartData" :key="index" class="flex-1 flex flex-col items-center gap-2 group">
-                      <div class="relative w-full flex items-end justify-center h-48"> <!-- Chart Height -->
-                           <!-- Tooltip -->
-                           <div class="absolute -top-8 bg-zinc-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                               {{ day.value }} 次
-                           </div>
-                           
-                           <!-- Bar -->
-                           <div 
-                            class="w-full max-w-[40px] bg-zinc-900 rounded-t-sm transition-all duration-1000 ease-out group-hover:opacity-80"
-                            :style="{ height: isMounted ? (day.value / maxChartValue) * 100 + '%' : '0%' }"
-                           ></div>
-                      </div>
-                      <span class="text-xs text-zinc-400 font-mono">{{ day.day }}</span>
-                  </div>
-              </div>
-          </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Monthly Usage Trend -->
+        <div class="lg:col-span-2 bg-card border border-border rounded-xl p-6 shadow-sm">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 class="text-lg font-bold text-foreground">借用趨勢</h3>
+                    <p class="text-sm text-muted-foreground">近 7 天器材與耗材借用狀況</p>
+                </div>
+                <select v-model="trendPeriod" class="text-sm border-border bg-background text-foreground rounded-md px-2 py-1 focus:ring-ring focus:border-ring">
+                    <option value="7d">近 7 天</option>
+                    <option value="30d">近 30 天</option>
+                </select>
+            </div>
+            <div class="h-[300px] w-full">
+                 <Line :data="borrowingTrend" :options="chartOptions" />
+            </div>
+        </div>
 
-          <!-- Ranking -->
-          <div class="col-span-1 bg-white border border-zinc-200 rounded-xl p-6 h-80 flex flex-col">
-              <div class="mb-4">
-                  <h3 class="text-sm font-medium text-zinc-500">熱門借用排行 Top 5</h3>
-              </div>
-              <div class="flex-1 overflow-y-auto pr-1">
-                  <div v-for="(item, idx) in topItems" :key="idx" class="flex items-center justify-between py-3 border-b border-zinc-50 last:border-0 hover:bg-zinc-50/50 rounded px-1 transition-colors">
-                      <div class="flex items-center gap-3">
-                          <span class="text-xs font-mono text-zinc-400 w-4">0{{ idx + 1 }}</span>
-                          <span class="text-sm font-medium text-zinc-700 truncate max-w-[120px]" :title="item.name">{{ item.name }}</span>
-                      </div>
-                      <span class="text-sm font-bold text-zinc-900">{{ item.count }}</span>
-                  </div>
-                  <div v-if="topItems.length === 0" class="h-full flex items-center justify-center text-zinc-300 text-sm">
-                      暫無數據
-                  </div>
-              </div>
-          </div>
-      </div>
+        <!-- Inventory Distribution -->
+        <div class="bg-card border border-border rounded-xl p-6 shadow-sm flex flex-col">
+             <div class="flex justify-between items-start mb-2">
+                 <div>
+                    <h3 class="text-lg font-bold text-foreground">庫存分佈</h3>
+                    <p class="text-sm text-muted-foreground">器材與耗材佔比</p>
+                 </div>
+                 <!-- Total Count Badge Removed - Moving to Center -->
+             </div>
+             
+             <div class="flex flex-col items-center gap-6 flex-1 pt-4">
+                 <!-- Chart -->
+                 <div class="h-[220px] w-[220px] relative shrink-0">
+                     <Doughnut :data="inventoryDistribution" :options="doughnutOptions" />
+                     
+                     <!-- Center Text Overlay -->
+                     <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <template v-if="hoveredInventoryItem">
+                             <span class="text-3xl font-bold text-foreground animate-in fade-in zoom-in-95 duration-200">
+                                 {{ hoveredInventoryItem.percent }}
+                             </span>
+                             <span class="text-xs text-muted-foreground font-medium mt-1">
+                                 {{ hoveredInventoryItem.label }}
+                             </span>
+                        </template>
+                        <template v-else>
+                             <span class="text-3xl font-bold text-foreground">
+                                 {{ inventory.length }}
+                             </span>
+                             <span class="text-xs text-muted-foreground font-medium mt-1">
+                                 總品項
+                             </span>
+                        </template>
+                     </div>
+                 </div>
+                 
+                 <!-- Custom Legend (Bottom) -->
+                 <div class="w-full grid grid-cols-2 gap-x-6 gap-y-3 pt-4 border-t border-border/50">
+                     <div v-for="(label, i) in inventoryDistribution.labels" :key="label" class="flex items-center justify-between group">
+                         <div class="flex items-center gap-2 min-w-0 w-full hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                             <!-- Restore Legend Dot -->
+                             <span class="w-2 h-2 rounded-full ring-2 ring-transparent group-hover:ring-border transition-all shrink-0" :style="{ backgroundColor: inventoryDistribution.datasets[0].backgroundColor[i] }"></span>
+                             
+                             <div class="flex-1 flex justify-between items-center min-w-0">
+                                 <span class="text-sm font-medium text-foreground truncate mr-2">{{ label }}</span>
+                                 <span class="text-sm font-bold text-muted-foreground font-mono shrink-0">
+                                     {{ Math.round((inventoryDistribution.datasets[0].data[i] / (inventoryDistribution.totalStock || 1)) * 100) }}%
+                                 </span>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+        </div>
+    </div>       <!-- Popular Items (Bar) Replaces manual ranking list if we want, or keep both. Limit space. -->
+           <!-- Let's put Popular Items as a Bar Chart in a FULL row below or replace the manual list? -->
+           <!-- User plan said: 3 cards. Distribution, Popular, Trend. -->
+           <!-- We currently have 3 slots in this grid. -->
+           <!-- Let's adjust grid: 
+                Row 1: [Distribution (1/3)] [Popular (2/3) - Bar Chart] 
+                Row 2: [Trend (Full)]
+                
+                Actually, Distribution is best square. Trend is wide. Popular can be list or bar.
+                Let's stick to:
+                [ Distribution ] [ Trend ] -> As is
+                Add a NEW row for [ Popular Items (Bar) ]
+           -->
+      <div ref="layer2Section" 
+           class="grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity duration-700" 
+           :class="isLayer2Visible ? 'animate-in fade-in slide-in-from-bottom-4 fill-mode-both' : 'opacity-0'">
+        <!-- Popular Items -->
+        <div class="bg-card border border-border rounded-xl p-6 shadow-sm">
+             <h3 class="text-lg font-bold text-foreground mb-4">熱門借用排行</h3>
+             <div class="space-y-4">
+                 <div v-for="(item, i) in topItems" :key="item.name" class="flex items-center gap-3">
+                     <span class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold" 
+                        :class="i < 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'">
+                        {{ i + 1 }}
+                     </span>
+                     <div class="flex-1 min-w-0">
+                         <div class="flex justify-between mb-1">
+                             <span class="text-sm font-medium text-foreground truncate">{{ item.name }}</span>
+                             <span class="text-xs font-bold text-foreground">{{ item.count }} 次</span>
+                         </div>
+                         <div class="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                             <div class="bg-primary/80 h-1.5 rounded-full transition-all duration-1000 ease-out delay-300" 
+                                  :style="{ width: isLayer2Visible ? `${(item.count / (topItems[0]?.count || 1)) * 100}%` : '0%' }"></div>
+                         </div>
+                     </div>
+                 </div>
+                 <div v-if="topItems.length === 0" class="text-center py-8 text-muted-foreground">
+                    尚無熱門資料
+                 </div>
+             </div>
+        </div>
 
+        <!-- Low Stock Alert -->
+        <div class="bg-card border border-border rounded-xl p-6 shadow-sm flex flex-col">
+             <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-foreground">低庫存警示</h3>
+                <RouterLink to="/admin/dashboard" class="text-xs font-medium text-primary hover:underline">查看全部</RouterLink>
+             </div>
+             
+             <div class="space-y-3 flex-1 overflow-y-auto max-h-[300px] pr-2">
+                 <div v-for="item in lowStockItems" :key="item.id" class="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
+                     <div class="flex items-center gap-3">
+                         <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                         <div>
+                             <div class="text-sm font-medium text-foreground">{{ item.name }}</div>
+                             <div class="text-xs text-muted-foreground">ID: {{ item.custom_id || 'N/A' }}</div>
+                         </div>
+                     </div>
+                     <div class="text-right">
+                         <div class="text-sm font-bold text-red-600 dark:text-red-400">{{ item.total_stock }}</div>
+                         <div class="text-[10px] text-muted-foreground">安全: {{ item.safety_stock }}</div>
+                     </div>
+                 </div>
+                 <div v-if="lowStockItems.length === 0" class="text-center py-12 flex flex-col items-center justify-center text-muted-foreground h-full">
+                    <CheckCircleIcon class="w-8 h-8 mb-2 text-green-500" />
+                    <span>庫存充足</span>
+                 </div>
+             </div>
+        </div>
+    </div>
       <!-- Layer 3: The Feed -->
-      <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 fill-mode-both" style="animation-fill-mode: both;">
-          <div class="p-6 border-b border-zinc-100 flex justify-between items-center">
-              <h3 class="text-sm font-medium text-zinc-500">即時動態</h3>
+      <div ref="feedSection" 
+           class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col transition-opacity duration-700" 
+           :class="isFeedVisible ? 'animate-in fade-in slide-in-from-bottom-4 fill-mode-both' : 'opacity-0'">
+          <div class="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+              <h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400">即時動態</h3>
               <!-- <button class="text-xs font-medium text-zinc-900 hover:underline">查看全部</button> -->
           </div>
           <div class="flex-1">
@@ -284,18 +591,18 @@ const feedItems = computed(() => {
                   <tbody>
                       <tr v-for="item in feedItems" :key="item.orderId" 
                           @click="emit('navigate', item)"
-                          class="border-b border-zinc-50 hover:bg-zinc-50 transition-colors group cursor-pointer">
+                          class="border-b border-zinc-50 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group cursor-pointer">
                           <td class="px-6 py-4 w-12">
                               <div v-if="item.priority === 'critical'" class="w-2 h-2 rounded-full bg-red-500"></div>
                               <div v-else-if="item.priority === 'high'" class="w-2 h-2 rounded-full bg-orange-500"></div>
-                              <div v-else class="w-2 h-2 rounded-full bg-zinc-300"></div>
+                              <div v-else class="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600"></div>
                           </td>
                           <td class="px-6 py-4">
-                              <span class="text-sm font-bold text-zinc-900 block mb-0.5">{{ item.title }}</span>
-                              <span class="text-xs text-zinc-500">{{ item.desc }}</span>
+                              <span class="text-sm font-bold text-zinc-900 dark:text-zinc-100 block mb-0.5">{{ item.title }}</span>
+                              <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ item.desc }}</span>
                           </td>
                           <td class="px-6 py-4 text-right">
-                               <span class="text-xs font-mono text-zinc-400 px-2 py-1 rounded bg-zinc-100 border border-zinc-200">{{ format(new Date(item.date), 'yyyy/MM/dd') }}</span>
+                               <span class="text-xs font-mono text-zinc-400 px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">{{ format(new Date(item.date), 'yyyy/MM/dd') }}</span>
                           </td>
                           <td class="px-6 py-4 text-right w-24 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button class="p-2 hover:bg-zinc-100 rounded-full transition-colors">
@@ -341,7 +648,7 @@ const feedItems = computed(() => {
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <span class="text-xs text-zinc-400">剩餘</span>
-                                <span class="text-sm font-bold text-orange-600 px-2 py-0.5 bg-orange-50 rounded">{{ item.total_stock }}</span>
+                                <span class="text-sm font-bold text-red-600 dark:text-red-400 px-2 py-0.5 bg-red-50 dark:bg-red-500/15 rounded">{{ item.total_stock }}</span>
                             </div>
                         </div>
                     </div>
