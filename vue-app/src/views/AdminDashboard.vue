@@ -11,7 +11,7 @@ import {
   ArrowUpTrayIcon,
   ArrowDownTrayIcon
 } from '@heroicons/vue/20/solid'
-import { MoreHorizontal, Trash, Power, FileEdit, Search, LayoutDashboard, ArrowUp, ArrowDown } from 'lucide-vue-next'
+import { MoreHorizontal, Trash, Power, FileEdit, Search, LayoutDashboard, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import * as XLSX from 'xlsx'
@@ -142,6 +142,42 @@ async function fetchOrders() {
   }
   loading.value = false
 }
+
+// --- Accordion Grouping ---
+const accordionState = ref({})
+
+function toggleAccordion(key) {
+    accordionState.value[key] = !accordionState.value[key]
+}
+
+const groupedOrders = computed(() => {
+    // 1. Filter orders based on activeTab
+    let filtered = []
+    if (activeTab.value === 'HISTORY') {
+        filtered = orders.value.filter(o => ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status))
+    } else if (['PENDING', 'APPROVED'].includes(activeTab.value)) {
+        filtered = orders.value.filter(o => o.status === activeTab.value)
+    } else {
+        // Fallback or other tabs
+        return {}
+    }
+
+    // 2. Group by Applicant
+    const groups = filtered.reduce((acc, order) => {
+        const name = order.applicant_name || '未署名'
+        if (!acc[name]) {
+            acc[name] = []
+            // Initialize accordion state if new (Details: Default Open)
+            if (accordionState.value[name] === undefined) {
+                 accordionState.value[name] = true 
+            }
+        }
+        acc[name].push(order)
+        return acc
+    }, {})
+
+    return groups
+})
 
 // --- Inventory Management ---
 const inventoryItems = ref([])
@@ -930,90 +966,113 @@ function exportHistoryExcel() {
        </div>
       
        <!-- Empty State -->
-       <div v-if="orders.filter(o => activeTab === 'HISTORY' ? ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status) : o.status === activeTab).length === 0" class="text-center py-12 bg-muted/20 rounded-lg border border-dashed border-border">
+       <div v-if="Object.keys(groupedOrders).length === 0" class="text-center py-12 bg-muted/20 rounded-lg border border-dashed border-border">
          <p class="text-muted-foreground">目前沒有資料</p>
        </div>
 
-      <div 
-        v-for="order in orders.filter(o => activeTab === 'HISTORY' ? ['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(o.status) : o.status === activeTab)" 
-        :key="order.id"
-        class="bg-card rounded-lg border border-border p-6 transition hover:border-input"
-      >
-        <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
-          
-          <!-- Info -->
-          <div class="flex-1">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="font-bold text-lg text-foreground">{{ order.applicant_name }}</span>
+       <!-- Grouped Orders (Accordion) -->
+       <div v-else class="space-y-4">
+          <div v-for="(groupOrders, applicant) in groupedOrders" :key="applicant" class="bg-card rounded-lg border border-border overflow-hidden">
               
-              <span class="px-2 py-0.5 rounded-md text-xs font-bold border ml-2" 
-                :class="{
-                  'bg-background border-border text-foreground': order.status === 'PENDING',
-                  'bg-primary text-primary-foreground border-primary': order.status === 'APPROVED' || order.status === 'COMPLETED',
-                  'bg-muted/50 text-muted-foreground border-border line-through': order.status === 'REJECTED' || order.status === 'CANCELLED',
-                  'bg-background text-muted-foreground border-border': order.status === 'RETURNED'
-                }">
-                <span v-if="order.status === 'APPROVED' || order.status === 'COMPLETED'" class="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-1 mb-0.5"></span>
-                 {{ 
-                        order.status === 'PENDING' ? '待審核' :
-                        order.status === 'APPROVED' ? '已核准' :
-                        order.status === 'COMPLETED' ? '已領用' :
-                        order.status === 'REJECTED' ? '已拒絕' :
-                        order.status === 'RETURNED' ? '已歸還' : order.status
-                 }}
-              </span>
-            </div>
-            
-            <div class="text-sm text-muted-foreground mb-2">
-              <span class="font-medium text-foreground">用途:</span> {{ order.purpose }}
-            </div>
-            
-            <div class="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-              <span class="bg-muted px-2 py-1 rounded border border-border">📅 {{ order.start_date }} ~ {{ order.end_date }}</span>
-            </div>
+              <!-- Accordion Header -->
+              <div 
+                @click="toggleAccordion(applicant)"
+                class="flex items-center justify-between p-4 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors select-none"
+              >
+                  <div class="flex items-center gap-3">
+                      <div class="p-1 rounded bg-background border border-border text-muted-foreground transition-transform duration-200" :class="{ 'rotate-90': accordionState[applicant] }">
+                          <ChevronRight class="w-4 h-4" />
+                      </div>
+                      <h3 class="font-bold text-foreground text-base">{{ applicant }}</h3>
+                      <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                          {{ groupOrders.length }} 筆申請
+                      </span>
+                  </div>
+              </div>
 
-            <!-- Items -->
-            <div class="mt-4 border-t border-border pt-3">
-              <ul class="space-y-1">
-                <li v-for="item in order.order_items" :key="item.id" class="text-sm flex justify-between text-muted-foreground">
-                  <span>{{ item.item_name_snapshot }}</span>
-                  <span class="font-mono font-medium text-foreground">x{{ item.quantity }}</span>
-                </li>
-              </ul>
-            </div>
+              <!-- Accordion Body -->
+              <div v-show="accordionState[applicant]" class="divide-y divide-border border-t border-border">
+                   <div 
+                    v-for="order in groupOrders" 
+                    :key="order.id"
+                    class="p-6 transition hover:bg-muted/10"
+                   >
+                    <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+                      
+                      <!-- Info -->
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                          <!-- Status Badge -->
+                          <span class="px-2 py-0.5 rounded-md text-xs font-bold border" 
+                            :class="{
+                              'bg-background border-border text-foreground': order.status === 'PENDING',
+                              'bg-primary text-primary-foreground border-primary': order.status === 'APPROVED' || order.status === 'COMPLETED',
+                              'bg-muted/50 text-muted-foreground border-border line-through': order.status === 'REJECTED' || order.status === 'CANCELLED',
+                              'bg-background text-muted-foreground border-border': order.status === 'RETURNED'
+                            }">
+                            <span v-if="order.status === 'APPROVED' || order.status === 'COMPLETED'" class="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-1 mb-0.5"></span>
+                             {{ 
+                                    order.status === 'PENDING' ? '待審核' :
+                                    order.status === 'APPROVED' ? '已核准' :
+                                    order.status === 'COMPLETED' ? '已領用' :
+                                    order.status === 'REJECTED' ? '已拒絕' :
+                                    order.status === 'RETURNED' ? '已歸還' : order.status
+                             }}
+                          </span>
+                        </div>
+                        
+                        <div class="text-sm text-muted-foreground mb-2">
+                          <span class="font-medium text-foreground">用途:</span> {{ order.purpose }}
+                        </div>
+                        
+                        <div class="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                          <span class="bg-muted px-2 py-1 rounded border border-border">📅 {{ order.start_date }} ~ {{ order.end_date }}</span>
+                        </div>
+
+                        <!-- Items -->
+                        <div class="mt-4 border-t border-border pt-3">
+                          <ul class="space-y-1">
+                            <li v-for="item in order.order_items" :key="item.id" class="text-sm flex justify-between text-muted-foreground">
+                              <span>{{ item.item_name_snapshot }}</span>
+                              <span class="font-mono font-medium text-foreground">x{{ item.quantity }}</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <!-- Actions -->
+                      <div class="flex flex-col gap-2 min-w-[120px]">
+                        <!-- Pending Actions -->
+                        <template v-if="order.status === 'PENDING'">
+                          <button @click="updateStatus(order.id, 'APPROVED')" class="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-md hover:bg-primary/90 transition text-sm font-medium">
+                            <CheckIcon class="w-3 h-3" /> 同意
+                          </button>
+                          <button @click="updateStatus(order.id, 'REJECTED')" class="flex items-center justify-center gap-2 bg-background border border-border text-muted-foreground px-3 py-2 rounded-md hover:bg-muted hover:text-destructive transition text-sm font-medium">
+                            <XMarkIcon class="w-3 h-3" /> 拒絕
+                          </button>
+                        </template>
+
+                        <!-- Approved Actions -->
+                        <template v-if="order.status === 'APPROVED'">
+                          <button @click="updateStatus(order.id, 'RETURNED')" class="flex items-center justify-center gap-2 bg-background border border-primary text-primary px-3 py-2 rounded-md hover:bg-secondary transition text-sm font-medium">
+                            <ArchiveBoxArrowDownIcon class="w-3 h-3" /> 歸還
+                          </button>
+                        </template>
+
+                        <!-- History Actions -->
+                         <template v-if="['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(order.status)">
+                          <button @click="deleteOrder(order.id)" class="flex items-center justify-center gap-1 bg-background border border-border text-muted-foreground px-3 py-2 rounded-md hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition text-xs font-medium">
+                            <Trash class="w-3 h-3" /> 刪除紀錄
+                          </button>
+                        </template>
+                      </div>
+
+                    </div>
+                   </div>
+              </div>
           </div>
-
-          <!-- Actions -->
-          <div class="flex flex-col gap-2 min-w-[120px]">
-            <!-- Pending Actions -->
-            <template v-if="order.status === 'PENDING'">
-              <button @click="updateStatus(order.id, 'APPROVED')" class="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-md hover:bg-primary/90 transition text-sm font-medium">
-                <CheckIcon class="w-3 h-3" /> 同意
-              </button>
-              <button @click="updateStatus(order.id, 'REJECTED')" class="flex items-center justify-center gap-2 bg-background border border-border text-muted-foreground px-3 py-2 rounded-md hover:bg-muted hover:text-destructive transition text-sm font-medium">
-                <XMarkIcon class="w-3 h-3" /> 拒絕
-              </button>
-            </template>
-
-            <!-- Approved Actions -->
-            <template v-if="order.status === 'APPROVED'">
-              <button @click="updateStatus(order.id, 'RETURNED')" class="flex items-center justify-center gap-2 bg-background border border-primary text-primary px-3 py-2 rounded-md hover:bg-secondary transition text-sm font-medium">
-                <ArchiveBoxArrowDownIcon class="w-3 h-3" /> 歸還
-              </button>
-            </template>
-
-            <!-- History Actions -->
-             <template v-if="['REJECTED', 'RETURNED', 'CANCELLED', 'COMPLETED'].includes(order.status)">
-              <button @click="deleteOrder(order.id)" class="flex items-center justify-center gap-1 bg-background border border-border text-muted-foreground px-3 py-2 rounded-md hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition text-xs font-medium">
-                <Trash class="w-3 h-3" /> 刪除紀錄
-              </button>
-            </template>
-          </div>
-
-        </div>
-      </div>
+       </div>
     </div>
-
   </div>
 
 

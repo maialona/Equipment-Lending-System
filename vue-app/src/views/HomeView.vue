@@ -14,13 +14,26 @@ const cart = useCartStore()
 
 async function fetchItems() {
   loading.value = true
-  const { data, error } = await supabase
-    .from('items')
-    .select('*')
-    .eq('is_active', true)
-    .eq('type', 'EQUIPMENT')
-    .neq('category', '空間')
+  
+  // Try RPC first
+  let { data, error } = await supabase.rpc('get_equipment_availability')
     
+  // If RPC fails (e.g., function not found), fall back to basic query
+  if (error) {
+    console.warn('Real-time stock check failed, falling back to basic list:', error)
+    
+    // Basic Query
+    const result = await supabase
+      .from('items')
+      .select('*')
+      .eq('is_active', true)
+      .eq('type', 'EQUIPMENT')
+      .neq('category', '空間')
+      
+    data = result.data
+    error = result.error
+  }
+
   if (error) {
     console.error('Error fetching items:', error)
   } else {
@@ -91,7 +104,9 @@ onMounted(() => {
           <div class="flex justify-between items-start mb-3">
              <!-- Category Tag Removed -->
              <div class="text-[10px] font-medium text-muted-foreground border border-border px-2 py-0.5 rounded bg-muted ml-auto">
-                在庫: {{ item.total_stock }}
+                {{ item.available_stock !== undefined ? '可借:' : '在庫:' }} 
+                <span class="text-zinc-900 font-bold">{{ item.available_stock !== undefined ? item.available_stock : item.total_stock }}</span> 
+                <span v-if="item.available_stock !== undefined">/ 總數: {{ item.total_stock }}</span>
              </div>
           </div>
           <h3 class="text-lg font-bold text-foreground mb-1 leading-tight">{{ item.name }}</h3>

@@ -152,6 +152,12 @@ async function submitOrder() {
 
       // Prepare Equipment Order
       if (hasEquip.value) {
+          
+          // CONFLICT CHECK (Advanced)
+          for (const item of equipItems.value) {
+              await checkEquipmentConflict(item, equipForm.start_date, equipForm.end_date, item.quantity)
+          }
+
           ordersToCreate.push({
               type: 'loan',
               items: equipItems.value,
@@ -227,7 +233,7 @@ async function submitOrder() {
   }
 }
 
-// Conflict Checker Helper
+// Conflict Checker Helper for Space
 async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
     // 1. Fetch relevant orders
     const { data: orders, error } = await supabase
@@ -244,12 +250,7 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
         .eq('start_date', date) // Same Day
         .neq('status', 'REJECTED')
         .neq('status', 'CANCELLED')
-        .neq('status', 'RETURNED') // Assuming logic: Returned means it WAS used, but checking for future conflicts usually implies 'ACTIVE' bookings.
-                                   // Actually, if it's 'RETURNED', the slot is free NOW, but we are booking a specific time slot.
-                                   // If history shows 'RETURNED' for 10:00-12:00, that slot WAS taken.
-                                   // But we are usually preventing future overlaps.
-                                   // Safest to exclude REJECTED/CANCELLED. 
-                                   // Better: Only check PENDING / APPROVED.
+        .neq('status', 'RETURNED') 
 
     if (error) throw error
 
@@ -264,7 +265,6 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
     }
 
     // Target Room Name (normalize)
-    // Assume input item name contains key keywords
     let targetKey = ''
     if (spaceItem.name.includes('A+B')) targetKey = '會議室A+B'
     else if (spaceItem.name.includes('A')) targetKey = '會議室A'
@@ -276,12 +276,8 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
 
     // 3. Iterate and Check
     for (const order of activeOrders) {
-        // Time Overlap Check: (StartA < EndB) and (EndA > StartB)
-        // Note: Time format is "HH:mm" (string comparison works for 24h)
         if (startTime < order.end_time && endTime > order.start_time) {
             
-            // Check Room Name in this order
-            // An order might have multiple items, check if ANY is a conflicting room
             const hasConflictingRoom = order.order_items.some(oi => {
                 if (oi.item_name_snapshot.includes('A+B') && conflictingRooms.includes('會議室A+B')) return true
                 if (oi.item_name_snapshot.includes('A') && !oi.item_name_snapshot.includes('B') && conflictingRooms.includes('會議室A')) return true
@@ -293,6 +289,30 @@ async function checkSpaceConflict(spaceItem, date, startTime, endTime) {
                 throw new Error(`該時段與現有預約衝突 (${order.start_time}-${order.end_time})`)
             }
         }
+    }
+}
+
+// Conflict Checker Helper for Equipment
+async function checkEquipmentConflict(item, startDate, endDate, requestedQty) {
+    // Call RPC function
+    const { data: reservedQty, error } = await supabase.rpc('check_stock_availability', {
+        p_item_id: item.id,
+        p_start_date: startDate,
+        p_end_date: endDate
+    })
+
+    if (error) {
+        console.error('Check Stock Error:', error)
+        // If RPC missing, bypass or throw? Better to warn but allow if function not ready, 
+        // OR strict mode. Let's assume strict.
+        throw new Error('無法檢查庫存狀態，請稍後再試')
+    }
+
+    const totalStock = Number(item.total_stock)
+    
+    // Check: Reserved + Requested > Total
+    if ((reservedQty + requestedQty) > totalStock) {
+        throw new Error(`庫存不足！${item.name} 於此時段已被借用 ${reservedQty} 個，剩餘 ${totalStock - reservedQty} 個。`)
     }
 }
 </script>
