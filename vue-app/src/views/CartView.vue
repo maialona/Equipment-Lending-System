@@ -328,7 +328,7 @@ async function checkEquipmentConflict(item, startDate, endDate, requestedQty) {
       </div>
       <h2 class="text-xl font-bold text-foreground mb-2">借用清單是空的</h2>
       <p class="text-muted-foreground mb-6 font-medium">還沒加入任何項目喔！</p>
-      <button @click="router.push('/')" class="bg-primary text-primary-foreground px-6 py-2.5 rounded-md hover:bg-primary/90 transition text-sm font-medium">去逛逛器材</button>
+      <button @click="router.push('/equipment')" class="bg-primary text-primary-foreground px-6 py-2.5 rounded-md hover:bg-primary/90 transition text-sm font-medium">去逛逛器材</button>
     </div>
 
     <!-- Success Message -->

@@ -2,14 +2,21 @@
 import { ref, onMounted, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useCartStore } from '../stores/cart'
-import { PlusIcon } from '@heroicons/vue/20/solid'
+import { PlusIcon, MagnifyingGlassIcon, InboxIcon } from '@heroicons/vue/20/solid'
 import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
+import { toast } from 'vue-sonner'
 
 const items = ref([])
 const loading = ref(true)
 const categories = ref([])
 const selectedCategory = ref('全部')
+const searchQuery = ref('')
 const cart = useCartStore()
+
+function handleAddToCart(item) {
+  cart.addItem(item)
+  toast.success(`${item.name} 已加入清單`)
+}
 
 async function fetchItems() {
   loading.value = true
@@ -32,8 +39,23 @@ async function fetchItems() {
 }
 
 const filteredItems = computed(() => {
-  if (selectedCategory.value === '全部') return items.value
-  return items.value.filter(i => i.category === selectedCategory.value)
+  let result = items.value
+
+  // 1. Filter by Category
+  if (selectedCategory.value !== '全部') {
+    result = result.filter(i => i.category === selectedCategory.value)
+  }
+
+  // 2. Filter by Search Query
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(i => 
+      (i.name && i.name.toLowerCase().includes(query)) ||
+      (i.custom_id && i.custom_id.toLowerCase().includes(query))
+    )
+  }
+
+  return result
 })
 
 onMounted(() => {
@@ -49,19 +71,34 @@ onMounted(() => {
       <p class="text-muted-foreground">請選擇您需要的耗材並加入清單。</p>
     </div>
 
-    <!-- Category Filter -->
-    <div class="flex flex-wrap gap-2 mb-6">
-      <button 
-        v-for="cat in categories" 
-        :key="cat"
-        @click="selectedCategory = cat"
-        class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors border"
-        :class="selectedCategory === cat 
-          ? 'bg-primary text-primary-foreground border-primary' 
-          : 'bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground'"
-      >
-        {{ cat }}
-      </button>
+    <!-- Filters: Search + Categories -->
+    <div class="flex flex-col sm:flex-row gap-4 mb-6 justify-between items-start sm:items-center">
+       
+        <!-- Category Filter -->
+        <div class="flex flex-wrap gap-2 order-2 sm:order-1">
+          <button 
+            v-for="cat in categories" 
+            :key="cat"
+            @click="selectedCategory = cat"
+            class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors border"
+            :class="selectedCategory === cat 
+              ? 'bg-primary text-primary-foreground border-primary' 
+              : 'bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground'"
+          >
+            {{ cat }}
+          </button>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative w-full sm:w-64 order-1 sm:order-2">
+            <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input 
+              v-model="searchQuery" 
+              type="text" 
+              placeholder="搜尋耗材名稱或編號..." 
+              class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+        </div>
     </div>
 
     <!-- Loading State (Skeleton) -->
@@ -70,7 +107,7 @@ onMounted(() => {
         <div>
           <div class="flex justify-between items-start mb-3">
              <Skeleton class="h-5 w-16 bg-muted" />
-             <Skeleton class="h-5 w-12 bg-muted" />
+             <Skeleton class="h-5 w-12 bg-muted/50" />
           </div>
           <Skeleton class="h-6 w-3/4 mb-2" />
           <Skeleton class="h-4 w-1/2" />
@@ -80,8 +117,12 @@ onMounted(() => {
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="items.length === 0" class="text-center py-12 bg-card rounded-lg border border-dashed border-border">
-        <p class="text-muted-foreground">目前沒有可用的耗材。</p>
+    <div v-else-if="filteredItems.length === 0" class="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-lg bg-card/50">
+        <div class="bg-muted rounded-full p-4 mb-3">
+            <MagnifyingGlassIcon class="w-8 h-8 text-muted-foreground" />
+        </div>
+        <h3 class="text-lg font-semibold text-foreground">找不到相關耗材</h3>
+        <p class="text-sm text-muted-foreground mt-1">請嘗試不同的關鍵字或類別。</p>
     </div>
 
     <!-- Grid -->
@@ -93,7 +134,7 @@ onMounted(() => {
           <div class="flex justify-between items-start mb-3">
              <!-- Category Tag Removed -->
              <div class="text-[10px] font-medium text-muted-foreground border border-border px-2 py-0.5 rounded bg-muted ml-auto">
-                庫存: {{ item.total_stock }}
+                庫存: <span class="text-zinc-900 dark:text-zinc-100 font-bold">{{ item.total_stock }}</span>
              </div>
           </div>
           <h3 class="text-lg font-bold text-foreground mb-1 leading-tight">{{ item.name }}</h3>
@@ -102,8 +143,8 @@ onMounted(() => {
 
         <!-- Action -->
         <button 
-          @click="cart.addItem(item)"
-          class="w-full mt-5 flex items-center justify-center gap-2 bg-zinc-900 text-white border border-transparent py-2 rounded-md hover:bg-zinc-800 transition-all text-sm font-medium opacity-0 group-hover:opacity-100"
+          @click="handleAddToCart(item)"
+          class="w-full mt-5 flex items-center justify-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border border-transparent py-2 rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all text-sm font-medium opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         >
           <PlusIcon class="w-4 h-4" />
           加入清單

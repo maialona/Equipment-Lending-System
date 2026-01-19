@@ -6,6 +6,7 @@ import { PlusIcon } from '@heroicons/vue/20/solid'
 import { CalendarDaysIcon } from '@heroicons/vue/24/outline'
 import ScheduleModal from '../components/ScheduleModal.vue'
 import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
+import { toast } from 'vue-sonner'
 
 const items = ref([])
 const bookings = ref([])
@@ -19,43 +20,51 @@ const selectedBookings = ref([])
 
 async function fetchRooms() {
   loading.value = true
-  // Fetch items where category is '空間' (Space)
-  const { data, error } = await supabase
-    .from('items')
-    .select('*')
-    .eq('category', '空間')
-    .eq('is_active', true)
-    
-  if (error) {
-    console.error('Error fetching rooms:', error)
-  } else {
+  try {
+    // Fetch items where category is '空間' (Space)
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('category', '空間')
+      .eq('is_active', true)
+      
+    if (error) throw error
     items.value = data
+  } catch (err) {
+    console.error('Error fetching rooms:', err)
+    toast.error('無法載入會議室資訊')
+  } finally {
+    loading.value = false
   }
-  loading.value = false
 }
 
 async function fetchBookings() {
-   const today = new Date().toISOString().split('T')[0]
-   const { data, error } = await supabase
-        .from('orders')
-        .select(`
-            id,
-            start_date,
-            start_time,
-            end_time,
-            applicant_name,
-            status,
-            order_items (
-                item_name_snapshot
-            )
-        `)
-        .gte('start_date', today)
-        .in('status', ['APPROVED', 'PENDING'])
-        .order('start_date', { ascending: true })
-        .order('start_time', { ascending: true })
-
-    if (error) console.error(error)
-    else bookings.value = data
+   try {
+     const today = new Date().toISOString().split('T')[0]
+     const { data, error } = await supabase
+          .from('orders')
+          .select(`
+              id,
+              start_date,
+              start_time,
+              end_time,
+              applicant_name,
+              status,
+              order_items (
+                  item_name_snapshot
+              )
+          `)
+          .gte('start_date', today)
+          .in('status', ['APPROVED', 'PENDING'])
+          .order('start_date', { ascending: true })
+          .order('start_time', { ascending: true })
+  
+      if (error) throw error
+      bookings.value = data
+   } catch (err) {
+      console.error('Error fetching bookings:', err)
+      toast.error('無法載入預約狀況')
+   }
 }
 
 // Helper to filter bookings for a specific room (Shared Logic)

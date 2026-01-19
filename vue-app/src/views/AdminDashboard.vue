@@ -9,7 +9,8 @@ import {
   ArchiveBoxArrowDownIcon,
   // TrashIcon, // Use Lucide instead
   ArrowUpTrayIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  CalendarDaysIcon
 } from '@heroicons/vue/20/solid'
 import { MoreHorizontal, Trash, Power, FileEdit, Search, LayoutDashboard, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -121,26 +122,29 @@ async function deleteOrder(orderId) {
 
 async function fetchOrders() {
   loading.value = true
-  // Fetch orders with items
-  const { data, error } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items (
-        id,
-        item_name_snapshot,
-        quantity,
-        items ( category )
-      )
-    `)
-    .order('created_at', { ascending: false })
+  try {
+    // Fetch orders with items
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          id,
+          item_name_snapshot,
+          quantity,
+          items ( category )
+        )
+      `)
+      .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error(error)
-  } else {
+    if (error) throw error
     orders.value = data
+  } catch (err) {
+    console.error(err)
+    triggerToast('無法載入訂單', 'error')
+  } finally {
+    loading.value = false
   }
-  loading.value = false
 }
 
 // --- Accordion Grouping ---
@@ -272,16 +276,22 @@ watch([searchQuery, activeTab], () => {
 })
 
 async function fetchInventory() {
-    let query = supabase.from('items').select('*').order('created_at', { ascending: false })
-    
-    if (activeTab.value === 'INVENTORY') {
-        query = query.eq('type', 'EQUIPMENT')
-    } else if (activeTab.value === 'CONSUMABLES') {
-        query = query.eq('type', 'CONSUMABLE')
+    try {
+      let query = supabase.from('items').select('*').order('created_at', { ascending: false })
+      
+      if (activeTab.value === 'INVENTORY') {
+          query = query.eq('type', 'EQUIPMENT')
+      } else if (activeTab.value === 'CONSUMABLES') {
+          query = query.eq('type', 'CONSUMABLE')
+      }
+      
+      const { data, error } = await query
+      if (error) throw error
+      inventoryItems.value = data
+    } catch (err) {
+      console.error(err)
+      triggerToast('無法載入庫存', 'error')
     }
-    
-    const { data, error } = await query
-    if (!error) inventoryItems.value = data
 }
 
 // Watch for tab change to fetch inventory
@@ -470,7 +480,7 @@ async function fetchUsers() {
 }
 
 watch(activeTab, (newTab) => {
-    if (newTab === 'INVENTORY' || newTab === 'CONSUMABLES') fetchInventory()
+    if (newTab === 'INVENTORY' || newTab === 'CONSUMABLES' || newTab === 'OVERVIEW') fetchInventory()
     if (newTab === 'USERS') fetchUsers()
     // Reset User Pagination
     if (newTab === 'USERS') currentUserPage.value = 1
@@ -570,6 +580,7 @@ function exportHistoryExcel() {
 
 <template>
   <div>
+    <div>
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-foreground tracking-tight">後台管理系統</h1>
@@ -644,16 +655,15 @@ function exportHistoryExcel() {
     </div>
 
     <!-- Overview Tab Content -->
-    <div v-if="activeTab === 'OVERVIEW'" class="mb-8">
+    <Transition name="fade" mode="out-in">
+    <div v-if="activeTab === 'OVERVIEW'" class="mb-8" key="overview">
         <DashboardOverview 
           :orders="orders" 
           :inventory="inventoryItems" 
           @navigate="handleNavigation"
         />
     </div>
-
-    <!-- Inventory / Consumables Tab Content -->
-    <div v-if="activeTab === 'INVENTORY' || activeTab === 'CONSUMABLES'">
+    <div v-else-if="activeTab === 'INVENTORY' || activeTab === 'CONSUMABLES'" :key="activeTab">
       
       <!-- Excel Actions -->
 
@@ -832,8 +842,7 @@ function exportHistoryExcel() {
       </div>
     </div>
 
-    <!-- User Management Tab Content -->
-    <div v-if="activeTab === 'USERS'">
+    <div v-else-if="activeTab === 'USERS'" key="users">
       <!-- Add User Form -->
       <div class="bg-card p-6 rounded-lg border border-border mb-6 shadow-sm">
         <h3 class="text-base font-bold text-foreground mb-4">新增人員</h3>
@@ -952,12 +961,10 @@ function exportHistoryExcel() {
       </div>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading && !['INVENTORY', 'USERS', 'CONSUMABLES'].includes(activeTab)" class="text-center py-12 text-muted-foreground">載入中...</div>
 
-    <!-- Order List (Only show when NOT in Inventory or Users tab) -->
-    <div v-if="!['OVERVIEW', 'INVENTORY', 'USERS', 'CONSUMABLES'].includes(activeTab) && !loading" class="space-y-4">
-      
+    <div v-else class="space-y-4" key="orders-list">
+       <div v-if="loading" class="text-center py-12 text-muted-foreground">載入中...</div>
+       <div v-else class="space-y-4">
        <!-- History Actions (Only for History Tab) -->
        <div v-if="activeTab === 'HISTORY'" class="flex justify-end mb-2">
           <button @click="exportHistoryExcel" class="flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 px-4 py-2 rounded-md shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 transition text-sm font-medium">
@@ -990,8 +997,12 @@ function exportHistoryExcel() {
                   </div>
               </div>
 
-              <!-- Accordion Body -->
-              <div v-show="accordionState[applicant]" class="divide-y divide-border border-t border-border">
+              <!-- Accordion Body (Smooth Transition) -->
+              <div 
+                class="grid transition-all duration-700 ease-in-out border-border" 
+                :class="accordionState[applicant] ? 'grid-rows-[1fr] opacity-100 border-t' : 'grid-rows-[0fr] opacity-0 border-t-0'"
+              >
+                   <div class="overflow-hidden divide-y divide-border">
                    <div 
                     v-for="order in groupOrders" 
                     :key="order.id"
@@ -1026,7 +1037,10 @@ function exportHistoryExcel() {
                         </div>
                         
                         <div class="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                          <span class="bg-muted px-2 py-1 rounded border border-border">📅 {{ order.start_date }} ~ {{ order.end_date }}</span>
+                          <span class="bg-muted px-2 py-1 rounded border border-border flex items-center">
+                            <CalendarDaysIcon class="w-3.5 h-3.5 mr-1.5 text-black dark:text-white" />
+                            {{ order.start_date }} ~ {{ order.end_date }}
+                          </span>
                         </div>
 
                         <!-- Items -->
@@ -1069,14 +1083,18 @@ function exportHistoryExcel() {
 
                     </div>
                    </div>
+                   </div>
               </div>
           </div>
        </div>
     </div>
-  </div>
+    </div>
 
 
-  <ConfirmModal
+    </Transition>
+    </div>
+
+    <ConfirmModal
     :isOpen="showModal"
     :title="modalConfig.title"
     :message="modalConfig.message"
@@ -1086,4 +1104,5 @@ function exportHistoryExcel() {
     @confirm="modalConfig.onConfirm"
     @cancel="showModal = false"
   />
+  </div>
 </template>

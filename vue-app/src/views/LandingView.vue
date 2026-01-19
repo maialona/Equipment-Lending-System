@@ -40,9 +40,9 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-64px)] flex items-center justify-center bg-muted/20 p-4">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-50 p-4 font-sans text-slate-900">
     <!-- Main Card -->
-    <div class="w-full max-w-4xl bg-card rounded-lg border border-border overflow-hidden flex shadow-xl shadow-black/5 md:min-h-[500px]">
+    <div class="w-full max-w-4xl bg-white rounded-lg border border-zinc-200 overflow-hidden flex shadow-xl shadow-black/5 md:min-h-[500px]">
       
       <!-- Left: Brand (Simplified) -->
       <div class="hidden md:flex w-5/12 bg-zinc-950 p-12 flex-col text-white relative overflow-hidden">
@@ -74,29 +74,29 @@ async function handleLogin() {
       </div>
 
       <!-- Right: Login Form -->
-      <div class="w-full md:w-7/12 p-8 md:p-16 flex flex-col justify-center bg-card relative">
+      <div class="w-full md:w-7/12 p-8 md:p-16 flex flex-col justify-center bg-white relative">
         <div class="max-w-xs mx-auto w-full">
             <div class="mb-10">
-              <h2 class="text-xl font-bold text-foreground">歡迎回來</h2>
-              <p class="text-sm text-muted-foreground mt-1">請輸入您的帳號密碼以登入</p>
+              <h2 class="text-xl font-bold text-zinc-900">歡迎回來</h2>
+              <p class="text-sm text-zinc-500 mt-1">請輸入您的帳號密碼以登入</p>
             </div>
 
             <!-- Error -->
-            <div v-if="error" class="mb-6 bg-destructive/10 text-destructive px-3 py-2.5 rounded-md text-sm border border-destructive/20 flex items-center gap-2">
+            <div v-if="error" class="mb-6 bg-red-50 text-red-600 px-3 py-2.5 rounded-md text-sm border border-red-100 flex items-center gap-2">
                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 shrink-0">
                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                </svg>
                {{ error }}
             </div>
 
-            <div class="space-y-5">
+            <form @submit.prevent="handleLogin" class="space-y-5">
               <div class="space-y-1.5">
-                 <label class="text-xs font-bold text-foreground">帳號</label>
+                 <label class="text-xs font-bold text-zinc-900">帳號</label>
                  <input 
                     v-model="username" 
-                    @keyup.enter="handleLogin"
                     type="text" 
-                    class="block w-full rounded-md border border-input bg-background shadow-sm focus:border-ring focus:ring-2 focus:ring-ring/20 py-2.5 px-3 transition-all text-sm placeholder:text-muted-foreground text-foreground"
+                    autocomplete="username"
+                    class="block w-full rounded-md border border-zinc-200 bg-white shadow-sm focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:ring-opacity-20 py-2.5 px-3 transition-all text-sm placeholder:text-zinc-400 text-zinc-900"
                     placeholder=""
                  >
               </div>
@@ -105,21 +105,21 @@ async function handleLogin() {
                  <label class="text-xs font-bold text-zinc-900">密碼</label>
                  <input 
                     v-model="password" 
-                    @keyup.enter="handleLogin"
                     type="password" 
-                    class="block w-full rounded-md border border-zinc-200 bg-white shadow-sm focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:ring-opacity-20 py-2.5 px-3 transition-all text-sm placeholder:text-zinc-400"
+                    autocomplete="current-password"
+                    class="block w-full rounded-md border border-zinc-200 bg-white shadow-sm focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:ring-opacity-20 py-2.5 px-3 transition-all text-sm placeholder:text-zinc-400 text-zinc-900"
                  >
               </div>
 
               <button 
-                @click="handleLogin" 
+                type="submit"
                 :disabled="loading"
                 class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-zinc-900 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-900 disabled:opacity-70 transition-all mt-8"
               >
                 <span v-if="loading">登入中...</span>
                 <span v-else>登入</span>
               </button>
-            </div>
+            </form>
         </div>
       </div>
     </div>

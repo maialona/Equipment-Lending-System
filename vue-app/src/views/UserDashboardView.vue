@@ -5,9 +5,12 @@ import {
   CubeIcon, 
   HomeIcon, 
   ExclamationTriangleIcon,
-  ClockIcon
+  ClockIcon,
+  InboxIcon
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '../stores/auth'
+import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
+import { toast } from 'vue-sonner'
 
 const auth = useAuthStore()
 
@@ -19,26 +22,30 @@ const loading = ref(true)
 
 async function fetchData() {
   loading.value = true
-  
-  // Fetch My Orders
-  if (auth.user && auth.user.name) {
-      const { data: myOrderData, error: myOrderError } = await supabase
-        .from('orders')
-        .select(`
-            *,
-            order_items (
-                item_name_snapshot,
-                quantity
-            )
-        `)
-        .or(`applicant_name.eq.${auth.user.name},applicant_name.eq.${auth.user.username}`)
-        .order('created_at', { ascending: false })
-        
-      if (myOrderError) console.error('Error fetching my orders:', myOrderError)
-      else myOrders.value = myOrderData
+  try {
+    // Fetch My Orders
+    if (auth.user && auth.user.name) {
+        const { data: myOrderData, error: myOrderError } = await supabase
+          .from('orders')
+          .select(`
+              *,
+              order_items (
+                  item_name_snapshot,
+                  quantity
+              )
+          `)
+          .or(`applicant_name.eq.${auth.user.name},applicant_name.eq.${auth.user.username}`)
+          .order('created_at', { ascending: false })
+          
+        if (myOrderError) throw myOrderError
+        myOrders.value = myOrderData
+    }
+  } catch (err) {
+    console.error('Error fetching data:', err)
+    toast.error('無法載入紀錄，請稍後再試')
+  } finally {
+    loading.value = false
   }
-
-  loading.value = false
 }
 
 onMounted(() => {
@@ -59,10 +66,26 @@ onMounted(() => {
     <div v-if="auth.isAuthenticated" class="bg-card rounded-lg border border-border overflow-hidden">
 
        
-       <div v-if="myOrders.length === 0" class="p-16 text-center flex flex-col items-center justify-center">
-          <div class="text-foreground font-medium mb-1">尚未有借用紀錄</div>
-          <p class="text-muted-foreground text-sm mb-6">您目前沒有正在進行中的借用，需要申請器材嗎？</p>
-          <RouterLink to="/equipment" class="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-md hover:bg-muted transition-colors shadow-sm">
+       <!-- Skeleton Loading -->
+       <div v-if="loading" class="p-6">
+          <div class="space-y-4">
+             <div v-for="n in 5" :key="n" class="flex gap-4 items-center">
+               <Skeleton class="h-12 w-1/4" />
+               <Skeleton class="h-12 w-1/4" />
+               <Skeleton class="h-12 w-1/4" />
+               <Skeleton class="h-12 w-1/4" />
+             </div>
+          </div>
+       </div>
+
+       <!-- Empty State -->
+       <div v-else-if="myOrders.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+          <div class="bg-muted rounded-full p-4 mb-3">
+              <InboxIcon class="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 class="text-lg font-semibold text-foreground">尚未有借用紀錄</h3>
+          <p class="text-sm text-muted-foreground mt-1 mb-6">您目前沒有正在進行中的借用，需要申請器材嗎？</p>
+          <RouterLink to="/equipment" class="px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors shadow-sm">
              前往器材列表
           </RouterLink>
        </div>

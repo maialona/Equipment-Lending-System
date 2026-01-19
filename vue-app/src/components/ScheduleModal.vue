@@ -74,17 +74,17 @@ function getWidth(startStr, endStr) {
             leave-from="opacity-100 scale-100"
             leave-to="opacity-0 scale-95"
           >
-            <DialogPanel class="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white px-8 py-6 text-left align-middle shadow-2xl transition-all">
+            <DialogPanel class="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 px-8 py-6 text-left align-middle shadow-2xl transition-all border border-transparent dark:border-zinc-800">
               
               <!-- Header -->
               <div class="flex justify-between items-start mb-6">
                   <div>
-                    <DialogTitle as="h3" class="text-2xl font-bold text-zinc-900 tracking-tight">
+                    <DialogTitle as="h3" class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                         {{ roomName }}
                     </DialogTitle>
-                    <div class="text-sm text-zinc-400 mt-1 font-medium">未來一週預約狀況</div>
+                    <div class="text-sm text-zinc-400 dark:text-zinc-500 mt-1 font-medium">未來一週預約狀況</div>
                   </div>
-                  <button @click="emit('close')" class="text-zinc-400 hover:text-black transition-colors p-2 -mr-2 -mt-2">
+                  <button @click="emit('close')" class="text-zinc-400 hover:text-black dark:text-zinc-500 dark:hover:text-zinc-200 transition-colors p-2 -mr-2 -mt-2">
                       <XMarkIcon class="w-6 h-6" />
                   </button>
               </div>
@@ -100,11 +100,11 @@ function getWidth(startStr, endStr) {
                         class="absolute top-0 flex flex-col items-center"
                         :style="{ left: ((i-1) / 11) * 100 + '%', transform: 'translateX(-50%)' }"
                     >
-                        <span class="text-[10px] uppercase tracking-wider text-zinc-400 font-mono mb-1">
+                        <span class="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-600 font-mono mb-1">
                             {{ 7 + i < 10 ? '0' + (7 + i) : (7 + i) }}:00
                         </span>
                         <!-- Tick Mark -->
-                        <div class="w-px h-1 bg-zinc-200"></div>
+                        <div class="w-px h-1 bg-zinc-200 dark:bg-zinc-800"></div>
                     </div>
                  </div>
 
@@ -113,7 +113,7 @@ function getWidth(startStr, endStr) {
                  <div class="absolute inset-0 top-7 flex pointer-events-none" aria-hidden="true">
                     <!-- We render 12 lines. The first and last align with edges. -->
                     <div v-for="i in 12" :key="i" 
-                         class="absolute top-0 bottom-0 w-px border-l border-dashed border-zinc-100"
+                         class="absolute top-0 bottom-0 w-px border-l border-dashed border-zinc-100 dark:border-zinc-800/50"
                          :class="{ 'border-transparent': i === 1 || i === 12 }" 
                          :style="{ left: ((i-1) / 11) * 100 + '%' }"
                     ></div>
@@ -123,23 +123,23 @@ function getWidth(startStr, endStr) {
                  <div class="space-y-5 relative z-10 mt-2">
                     <div v-for="day in next7Days" :key="day.date" class="relative group">
                         <!-- Day Label -->
-                        <div class="text-xs font-bold text-zinc-900 mb-1 flex items-center justify-between">
+                        <div class="text-xs font-bold text-zinc-900 dark:text-zinc-300 mb-1 flex items-center justify-between">
                             <span>{{ day.label }}</span>
-                            <span v-if="day.date === today.toISOString().split('T')[0]" class="text-[10px] text-white bg-black px-1.5 py-0.5 rounded font-medium">TODAY</span>
+                            <span v-if="day.date === today.toISOString().split('T')[0]" class="text-[10px] text-white bg-black dark:bg-zinc-100 dark:text-zinc-900 px-1.5 py-0.5 rounded font-medium">TODAY</span>
                         </div>
 
                         <!-- Timeline Bar -->
-                        <div class="h-6 w-full bg-zinc-50 border border-zinc-100 rounded-sm relative overflow-hidden">
+                        <div class="h-6 w-full bg-zinc-50 dark:bg-zinc-800/30 border border-zinc-100 dark:border-zinc-800 rounded-sm relative overflow-hidden">
                             <!-- Bookings -->
                             <div 
                                v-for="booking in bookings.filter(b => b.start_date === day.date)" 
                                :key="booking.id"
-                               class="absolute top-0 bottom-0 bg-zinc-700 hover:bg-zinc-900 transition-colors z-10 flex items-center justify-center cursor-help group/block"
+                               class="absolute top-0 bottom-0 bg-zinc-700 hover:bg-zinc-900 dark:bg-zinc-100 dark:hover:bg-white transition-colors z-10 flex items-center justify-center cursor-help group/block"
                                :style="{ left: getPosition(booking.start_time) + '%', width: getWidth(booking.start_time, booking.end_time) + '%' }"
                                :title="booking.applicant_name + ' (' + booking.start_time + '-' + booking.end_time + ')'"
                             >
                                <!-- Tooltip/Label inside block if wide enough -->
-                               <span class="text-[10px] text-white font-mono opacity-0 group-hover/block:opacity-100 whitespace-nowrap overflow-hidden px-1">
+                               <span class="text-[10px] text-white dark:text-zinc-900 font-mono opacity-0 group-hover/block:opacity-100 whitespace-nowrap overflow-hidden px-1">
                                    {{ booking.start_time }}
                                </span>
                             </div>
